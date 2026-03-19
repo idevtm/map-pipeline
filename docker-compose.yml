@@ -1,0 +1,15 @@
+services:
+  martin:
+    image: ${MARTIN_IMAGE}
+    container_name: ${MARTIN_CONTAINER_NAME:-map-pipeline-martin}
+    command:
+      - --config
+      - /etc/martin/config.yaml
+    ports:
+      - "${MARTIN_PORT:-3000}:3000"
+    restart: unless-stopped
+    user: "65534:65534"
+    volumes:
+      - ./martin/config.yaml:/etc/martin/config.yaml:ro
+      - ./data:/data:ro
+      - ./styles:/styles:ro

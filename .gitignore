@@ -1,0 +1,16 @@
+.DS_Store
+*.log
+
+data/build/*
+!data/build/.gitkeep
+
+data/cache/*
+!data/cache/.gitkeep
+
+data/incoming/*
+!data/incoming/.gitkeep
+
+data/published/*
+!data/published/.gitkeep
+
+docker-compose.override.yml

@@ -1,0 +1,122 @@
+{
+  "version": 8,
+  "name": "Basemap",
+  "metadata": {
+    "generator": "map-pipeline"
+  },
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "/basemap"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#eef3e8"
+      }
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landcover",
+      "paint": {
+        "fill-color": "#d6e6bf",
+        "fill-opacity": 0.8
+      }
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landuse",
+      "paint": {
+        "fill-color": "#d9ebc8",
+        "fill-opacity": 0.65
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#8bc6ec"
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#b8d88d",
+        "fill-opacity": 0.8
+      }
+    },
+    {
+      "id": "boundary",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "boundary",
+      "paint": {
+        "line-color": "#8a816c",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          0,
+          0.4,
+          6,
+          1.2
+        ],
+        "line-dasharray": [
+          2,
+          1
+        ]
+      }
+    },
+    {
+      "id": "roads",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "paint": {
+        "line-color": "#ffffff",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          5,
+          0.5,
+          10,
+          1.5,
+          14,
+          4
+        ]
+      }
+    },
+    {
+      "id": "buildings",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "building",
+      "paint": {
+        "fill-color": "#d7c6b4",
+        "fill-opacity": 0.85,
+        "fill-outline-color": "#c1ae9a"
+      }
+    }
+  ]
+}

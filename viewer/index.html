@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Map Pipeline Viewer</title>
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+        background: #f4f1e8;
+        color: #1b1a17;
+      }
+
+      body {
+        margin: 0;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: 100vh;
+      }
+
+      aside {
+        box-sizing: border-box;
+        padding: 24px;
+        background: linear-gradient(180deg, #f9f2dd, #efe7d1);
+        border-right: 1px solid rgba(27, 26, 23, 0.12);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.6rem;
+      }
+
+      p,
+      label,
+      button,
+      code {
+        font-size: 0.95rem;
+      }
+
+      label {
+        display: block;
+        margin-top: 18px;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid rgba(27, 26, 23, 0.2);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.75);
+      }
+
+      button {
+        margin-top: 18px;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 999px;
+        background: #2d6a4f;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #24553f;
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        padding: 10px 12px;
+        border: 1px solid rgba(27, 26, 23, 0.12);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.55);
+      }
+
+      .toggle input {
+        width: auto;
+        margin: 0;
+      }
+
+      .toggle label {
+        margin: 0;
+        font-weight: 600;
+      }
+
+      #status {
+        margin-top: 18px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.65);
+        border: 1px solid rgba(27, 26, 23, 0.1);
+        white-space: pre-wrap;
+      }
+
+      #map {
+        min-height: 100vh;
+      }
+
+      .hint {
+        margin-top: 18px;
+        color: rgba(27, 26, 23, 0.72);
+      }
+
+      @media (max-width: 900px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+        }
+
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid rgba(27, 26, 23, 0.12);
+        }
+
+        #map {
+          min-height: 65vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <h1>Map Pipeline Viewer</h1>
+      <p>Minimal local viewer for the published Martin style.</p>
+
+      <label for="martinBase">Martin Base URL</label>
+      <input id="martinBase" type="text" value="http://localhost:3000">
+
+      <label for="styleId">Style ID</label>
+      <input id="styleId" type="text" value="basemap">
+
+      <div class="toggle">
+        <input id="showTileDebug" type="checkbox">
+        <label for="showTileDebug">Show tile borders, numbers, and sizes</label>
+      </div>
+
+      <button id="reloadButton" type="button">Reload Map</button>
+
+      <div id="status">Waiting for map load.</div>
+
+      <p class="hint">
+        Serve this directory locally, for example:
+        <code>python3 -m http.server --directory viewer 8081</code>
+      </p>
+    </aside>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script>
+      const statusNode = document.getElementById("status");
+      const martinBaseInput = document.getElementById("martinBase");
+      const styleIdInput = document.getElementById("styleId");
+      const showTileDebugInput = document.getElementById("showTileDebug");
+      const reloadButton = document.getElementById("reloadButton");
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.get("base")) {
+        martinBaseInput.value = params.get("base");
+      }
+      if (params.get("style")) {
+        styleIdInput.value = params.get("style");
+      }
+      if (params.get("debugTiles") === "1") {
+        showTileDebugInput.checked = true;
+      }
+
+      let map;
+
+      function setStatus(message) {
+        statusNode.textContent = message;
+      }
+
+      async function loadStyle(baseUrl, styleId) {
+        const response = await fetch(`${baseUrl}/style/${styleId}`);
+        if (!response.ok) {
+          throw new Error(`style request failed: ${response.status} ${response.statusText}`);
+        }
+
+        const style = await response.json();
+        for (const source of Object.values(style.sources || {})) {
+          if (source && typeof source.url === "string" && source.url.startsWith("/")) {
+            source.url = `${baseUrl}${source.url}`;
+          }
+        }
+        return style;
+      }
+
+      async function render() {
+        const baseUrl = martinBaseInput.value.replace(/\/$/, "");
+        const styleId = styleIdInput.value.trim() || "basemap";
+        const showTileDebug = showTileDebugInput.checked;
+        const styleUrl = `${baseUrl}/style/${styleId}`;
+
+        setStatus(`Loading ${styleUrl}`);
+
+        const style = await loadStyle(baseUrl, styleId);
+
+        if (map) {
+          map.remove();
+        }
+
+        map = new maplibregl.Map({
+          container: "map",
+          style,
+          center: [13.42254, 52.50638],
+          zoom: 10,
+          hash: true
+        });
+
+        map.showTileBoundaries = showTileDebug;
+
+        map.addControl(new maplibregl.NavigationControl(), "top-right");
+        map.on("load", () => {
+          setStatus(
+            `Loaded ${styleId} from ${baseUrl}${showTileDebug ? "\nTile debug overlay enabled." : ""}`
+          );
+          const url = new URL(window.location.href);
+          url.searchParams.set("base", baseUrl);
+          url.searchParams.set("style", styleId);
+          url.searchParams.set("debugTiles", showTileDebug ? "1" : "0");
+          window.history.replaceState({}, "", url);
+        });
+        map.on("error", (event) => {
+          const reason = event && event.error ? event.error.message : "unknown map error";
+          setStatus(`Map error: ${reason}`);
+        });
+      }
+
+      reloadButton.addEventListener("click", () => {
+        render().catch((error) => setStatus(`Load failed: ${error.message}`));
+      });
+
+      showTileDebugInput.addEventListener("change", () => {
+        if (map) {
+          map.showTileBoundaries = showTileDebugInput.checked;
+          const url = new URL(window.location.href);
+          url.searchParams.set("debugTiles", showTileDebugInput.checked ? "1" : "0");
+          window.history.replaceState({}, "", url);
+          setStatus(
+            showTileDebugInput.checked
+              ? "Tile debug overlay enabled."
+              : "Tile debug overlay disabled."
+          );
+        }
+      });
+
+      render().catch((error) => setStatus(`Load failed: ${error.message}`));
+    </script>
+  </body>
+</html>
