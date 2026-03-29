@@ -53,9 +53,9 @@ Key variables:
 - `TILESET_NAME`: Stable source ID used by the scripts and the bundled styles. Keep this at `basemap` unless you also update `martin/config.yaml` and the style source names.
 - `PLANETILER_JAVA_XMX`: JVM heap for Planetiler. Default `8g`.
 - `PLANETILER_STORAGE`: Planetiler temp storage mode. Default `mmap`.
-- `PLANETILER_IMAGE`: Pinned Planetiler image. Current working default: `ghcr.io/onthegomap/planetiler:0.10.1`.
-- `MARTIN_IMAGE`: Pinned Martin image. Current working default: `ghcr.io/maplibre/martin:latest`.
 - `BUILD_RETENTION`: Number of build artifacts retained after successful publish. Default `3`.
+
+Dependency versions for Martin and Planetiler are not managed through `.env`. They are pinned in Dockerfiles under `docker/` so Dependabot can update them automatically.
 
 ## First Run
 
@@ -64,6 +64,8 @@ Start Martin in the background:
 ```bash
 docker compose up -d
 ```
+
+On the first run, Docker Compose builds the local Martin runtime image from `docker/martin/Dockerfile`.
 
 Build and publish tiles from a source extract:
 
@@ -94,9 +96,28 @@ Each build produces a new timestamped file in `data/build/`. Publishing never ov
 Behavior:
 
 - Validates the input path and file extension.
-- Runs Planetiler in Docker using the pinned image.
+- Builds the local Planetiler runtime image from `docker/planetiler/Dockerfile`.
+- Runs Planetiler in Docker using that local image.
 - Writes a versioned MBTiles file to `data/build/`.
 - Prints the absolute output path on success.
+
+## Dependency Updates With Dependabot
+
+Martin and Planetiler are pinned in these files:
+
+- `docker/martin/Dockerfile`
+- `docker/planetiler/Dockerfile`
+
+Dependabot is configured in `.github/dependabot.yml` to watch both Dockerfile directories and open update PRs when new base images are available.
+
+After merging a Dependabot PR:
+
+```bash
+docker compose build martin
+./scripts/build-tiles.sh data/incoming/map.osm.pbf
+```
+
+That rebuilds the local Martin runtime image and the local Planetiler runtime image with the updated base image versions.
 
 ### Publish Only
 

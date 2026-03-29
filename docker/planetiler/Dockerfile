@@ -1,0 +1,1 @@
+FROM ghcr.io/onthegomap/planetiler:0.10.1@sha256:0fea4f395b6622d7c9a16bdc09aa05afc3dc135b1306d4ca390f46f00590ca3f

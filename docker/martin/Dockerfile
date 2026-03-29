@@ -1,0 +1,1 @@
+FROM ghcr.io/maplibre/martin:latest@sha256:9fb167869c47828254332dfe4355c1454a53f19d32d1878db54f8cbdac84c45e

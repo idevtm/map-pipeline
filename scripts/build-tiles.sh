@@ -57,6 +57,8 @@ main() {
     docker_args+=(--threads="${PLANETILER_THREADS}")
   fi
 
+  build_planetiler_runtime_image
+
   log "building ${output_name} from ${input_path}"
 
   docker run --rm \
@@ -64,7 +66,7 @@ main() {
     -v "${REPO_ROOT}:/workspace" \
     -v "${input_dir}:/input:ro" \
     -w /workspace \
-    "${PLANETILER_IMAGE}" \
+    "${PLANETILER_RUNTIME_IMAGE}" \
     "${docker_args[@]}" \
     1>&2
 

@@ -1,6 +1,8 @@
 services:
   martin:
-    image: ${MARTIN_IMAGE}
+    build:
+      context: ./docker/martin
+    image: map-pipeline-martin:local
     container_name: ${MARTIN_CONTAINER_NAME:-map-pipeline-martin}
     command:
       - --config
