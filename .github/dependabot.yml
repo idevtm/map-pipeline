@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: "/docker/martin"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+  - package-ecosystem: docker
+    directory: "/docker/planetiler"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps

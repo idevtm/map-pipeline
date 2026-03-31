@@ -36,10 +36,10 @@ load_env() {
   : "${TILESET_NAME:=basemap}"
   : "${PLANETILER_JAVA_XMX:=8g}"
   : "${PLANETILER_STORAGE:=mmap}"
-  : "${PLANETILER_IMAGE:=ghcr.io/onthegomap/planetiler:0.10.1}"
-  : "${MARTIN_IMAGE:=ghcr.io/maplibre/martin:latest}"
   : "${BUILD_RETENTION:=3}"
   : "${MARTIN_CONTAINER_NAME:=map-pipeline-martin}"
+
+  PLANETILER_RUNTIME_IMAGE="map-pipeline-planetiler:local"
 
   DATA_DIR="${REPO_ROOT}/data"
   DATA_INCOMING_DIR="${DATA_DIR}/incoming"
@@ -77,4 +77,11 @@ assert_mbtiles_in_build_dir() {
 relative_published_target() {
   local mbtiles_path="$1"
   printf '../build/%s\n' "$(basename -- "${mbtiles_path}")"
+}
+
+build_planetiler_runtime_image() {
+  log "building local Planetiler runtime image"
+  docker build \
+    -t "${PLANETILER_RUNTIME_IMAGE}" \
+    "${REPO_ROOT}/docker/planetiler"
 }
