@@ -16,6 +16,23 @@ Verifies the live Martin endpoints used by this repository:
 EOF
 }
 
+wait_for_http() {
+  local url="$1"
+  local attempts="${2:-30}"
+  local delay_seconds="${3:-1}"
+  local attempt=1
+
+  while (( attempt <= attempts )); do
+    if curl -fsS "${url}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "${delay_seconds}"
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 validate_catalog() {
   local payload="$1"
 
@@ -114,6 +131,8 @@ main() {
   local style_id
 
   log "smoke testing ${base_url}"
+
+  wait_for_http "${base_url}/health" || die "Martin did not become ready at ${base_url}/health"
 
   catalog=$(curl -fsS "${base_url}/catalog")
   validate_catalog "${catalog}" "${base_url}"

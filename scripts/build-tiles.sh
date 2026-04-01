@@ -6,10 +6,70 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 usage() {
   cat >&2 <<'EOF'
-Usage: ./scripts/build-tiles.sh <path-to.osm.pbf>
+Usage: ./scripts/build-tiles.sh [--tile-format mvt|mlt] [--mlt] <path-to.osm.pbf>
 
 Builds a versioned MBTiles artifact under data/build/ using Planetiler in Docker.
+
+Options:
+  --tile-format FORMAT  Output tile payload format. Supported: mvt, mlt.
+  --mlt                 Shortcut for --tile-format mlt.
 EOF
+}
+
+parse_args() {
+  TILE_FORMAT="mvt"
+  BUILD_INPUT_ARG=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --tile-format)
+        [[ $# -ge 2 ]] || die "missing value for --tile-format"
+        TILE_FORMAT="$2"
+        shift 2
+        ;;
+      --tile-format=*)
+        TILE_FORMAT="${1#*=}"
+        shift
+        ;;
+      --mlt)
+        TILE_FORMAT="mlt"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        die "unknown option: $1"
+        ;;
+      *)
+        if [[ -n "${BUILD_INPUT_ARG}" ]]; then
+          die "only one input file is supported"
+        fi
+        BUILD_INPUT_ARG="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [[ $# -gt 0 ]]; then
+    [[ -z "${BUILD_INPUT_ARG}" && $# -eq 1 ]] || die "unexpected extra arguments"
+    BUILD_INPUT_ARG="${1:-${BUILD_INPUT_ARG}}"
+  fi
+
+  case "${TILE_FORMAT}" in
+    mvt|mlt) ;;
+    *) die "unsupported tile format: ${TILE_FORMAT} (expected mvt or mlt)" ;;
+  esac
+
+  [[ -n "${BUILD_INPUT_ARG}" ]] || {
+    usage
+    exit 1
+  }
 }
 
 main() {
@@ -18,12 +78,9 @@ main() {
 
   require_command docker
 
-  if [[ $# -ne 1 ]]; then
-    usage
-    exit 1
-  fi
+  parse_args "$@"
 
-  local input_arg="$1"
+  local input_arg="${BUILD_INPUT_ARG}"
   local input_path
   input_path=$(resolve_path "${input_arg}") || die "unable to resolve input path: ${input_arg}"
 
@@ -50,6 +107,7 @@ main() {
   docker_args+=(--tmpdir="/workspace/data/cache/planetiler/tmp")
   docker_args+=(--download-dir="/workspace/data/cache/planetiler/downloads")
   docker_args+=(--storage="${PLANETILER_STORAGE}")
+  docker_args+=(--tile-format="${TILE_FORMAT}")
   docker_args+=(--download)
   docker_args+=(--force)
 
@@ -59,7 +117,7 @@ main() {
 
   build_planetiler_runtime_image
 
-  log "building ${output_name} from ${input_path}"
+  log "building ${output_name} from ${input_path} with tile format ${TILE_FORMAT}"
 
   docker run --rm \
     -e "JAVA_TOOL_OPTIONS=-Xmx${PLANETILER_JAVA_XMX}" \
