@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Map Pipeline Viewer</title>
-    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+    <link href="https://unpkg.com/maplibre-gl@5.21.1/dist/maplibre-gl.css" rel="stylesheet">
     <style>
       :root {
         color-scheme: light;
@@ -153,7 +153,7 @@
 
     <div id="map"></div>
 
-    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@5.21.1/dist/maplibre-gl.js"></script>
     <script>
       const statusNode = document.getElementById("status");
       const martinBaseInput = document.getElementById("martinBase");
@@ -178,18 +178,41 @@
         statusNode.textContent = message;
       }
 
-      async function loadStyle(baseUrl, styleId) {
-        const response = await fetch(`${baseUrl}/style/${styleId}`);
+      async function fetchJson(url) {
+        const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`style request failed: ${response.status} ${response.statusText}`);
+          throw new Error(`request failed: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+      }
+
+      async function normalizeVectorSource(baseUrl, source) {
+        if (!source || source.type !== "vector" || typeof source.url !== "string") {
+          return source;
         }
 
-        const style = await response.json();
+        const tileJsonUrl = source.url.startsWith("/") ? `${baseUrl}${source.url}` : source.url;
+        const tileJson = await fetchJson(tileJsonUrl);
+
+        if (tileJson.format === "application/vnd.maplibre-vector-tile") {
+          source.encoding = "mlt";
+        }
+
+        return source;
+      }
+
+      async function loadStyle(baseUrl, styleId) {
+        const style = await fetchJson(`${baseUrl}/style/${styleId}`);
         for (const source of Object.values(style.sources || {})) {
           if (source && typeof source.url === "string" && source.url.startsWith("/")) {
             source.url = `${baseUrl}${source.url}`;
           }
         }
+
+        await Promise.all(
+          Object.values(style.sources || {}).map((source) => normalizeVectorSource(baseUrl, source))
+        );
+
         return style;
       }
 
