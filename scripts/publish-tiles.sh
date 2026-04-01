@@ -65,6 +65,11 @@ cleanup_builds() {
   done < <(find "${DATA_BUILD_DIR}" -maxdepth 1 -type f -name '*.mbtiles' -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2-)
 }
 
+start_martin() {
+  log "starting Martin"
+  compose up -d martin >/dev/null
+}
+
 main() {
   load_env
   ensure_directories
@@ -106,8 +111,7 @@ main() {
   ln -sfn "${relative_target}" "${temp_link}"
   mv -Tf -- "${temp_link}" "${current_link}"
 
-  log "restarting Martin"
-  compose restart martin >/dev/null
+  start_martin
 
   log "running smoke tests"
   if ! "${SCRIPT_DIR}/smoke-test.sh" >/dev/null; then
@@ -115,7 +119,7 @@ main() {
       log "smoke tests failed; rolling back published symlink"
       ln -sfn "${previous_relative_target}" "${temp_link}"
       mv -Tf -- "${temp_link}" "${current_link}"
-      compose restart martin >/dev/null || true
+      start_martin || true
     fi
     die "smoke tests failed after publish"
   fi

@@ -12,6 +12,8 @@ Data flow:
 .osm.pbf -> Planetiler -> data/build/<timestamped>.mbtiles -> current.mbtiles symlink -> Martin serves /basemap
 ```
 
+Planetiler can generate either MVT or MLT tile payloads inside the MBTiles archive. This repository now exposes that choice through a build-time CLI flag.
+
 ## Repository Layout
 
 ```text
@@ -93,11 +95,19 @@ Each build produces a new timestamped file in `data/build/`. Publishing never ov
 ./scripts/build-tiles.sh data/incoming/map.osm.pbf
 ```
 
+Build MLT tiles instead of MVT:
+
+```bash
+./scripts/build-tiles.sh --tile-format mlt data/incoming/map.osm.pbf
+```
+
 Behavior:
 
 - Validates the input path and file extension.
 - Builds the local Planetiler runtime image from `docker/planetiler/Dockerfile`.
 - Runs Planetiler in Docker using that local image.
+- Uses Planetiler `--tile-format=mvt` by default.
+- Passes `--tile-format=mlt` when requested through `--tile-format mlt` or `--mlt`.
 - Writes a versioned MBTiles file to `data/build/`.
 - Prints the absolute output path on success.
 
@@ -142,11 +152,36 @@ Behavior:
 ./scripts/rebuild-and-publish.sh data/incoming/map.osm.pbf
 ```
 
+Full pipeline with MLT output:
+
+```bash
+./scripts/rebuild-and-publish.sh --tile-format mlt data/incoming/map.osm.pbf
+```
+
 Behavior:
 
 - Runs build and publish sequentially.
 - Stops on the first failure.
 - Leaves the currently published tiles untouched if the build or validation fails.
+
+## MVT And MLT Options
+
+Planetiler supports generating MapLibre Tiles with `--tile-format=mlt` in addition to the default MVT output. Martin supports serving MLT tiles from MBTiles and detects them as `application/vnd.maplibre-vector-tile`.
+
+Technical options in this repository:
+
+- Default MVT build: `./scripts/build-tiles.sh data/incoming/map.osm.pbf`
+- Explicit MVT build: `./scripts/build-tiles.sh --tile-format mvt data/incoming/map.osm.pbf`
+- Explicit MLT build: `./scripts/build-tiles.sh --tile-format mlt data/incoming/map.osm.pbf`
+- MLT shorthand: `./scripts/build-tiles.sh --mlt data/incoming/map.osm.pbf`
+- Full pipeline with MLT: `./scripts/rebuild-and-publish.sh --mlt data/incoming/map.osm.pbf`
+
+Operational notes:
+
+- The published artifact is still an `.mbtiles` file in both cases. Only the tile payload format inside the archive changes.
+- Martin can serve both formats from MBTiles.
+- The current bundled MapLibre GL viewer and styles are designed for MVT. Treat MLT output as a server-side/archive option unless your downstream client stack explicitly supports MLT.
+- Publish validation still checks SQLite integrity, metadata presence, and tile presence. It does not attempt client-side rendering validation for MLT.
 
 ### Smoke Test Only
 
