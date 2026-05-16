@@ -1,1 +1,1 @@
-FROM ghcr.io/maplibre/martin:latest@sha256:9fb167869c47828254332dfe4355c1454a53f19d32d1878db54f8cbdac84c45e
+FROM ghcr.io/maplibre/martin:latest@sha256:13416ff1ec035af655e80b2d1889cf8ac234a013fde1308bb63c93d31b5db7a4
