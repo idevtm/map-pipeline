@@ -8,7 +8,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage: ./scripts/publish-tiles.sh <path-to.mbtiles>
 
-Validates an MBTiles artifact, atomically promotes it to current.mbtiles, restarts Martin,
+Validates an MBTiles artifact, atomically promotes it to current.mbtiles, refreshes Martin,
 and cleans up old build artifacts.
 EOF
 }
@@ -65,9 +65,10 @@ cleanup_builds() {
   done < <(find "${DATA_BUILD_DIR}" -maxdepth 1 -type f -name '*.mbtiles' -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2-)
 }
 
-start_martin() {
-  log "starting Martin"
+refresh_martin() {
+  log "refreshing Martin"
   compose up -d martin >/dev/null
+  compose restart martin >/dev/null
 }
 
 main() {
@@ -111,7 +112,7 @@ main() {
   ln -sfn "${relative_target}" "${temp_link}"
   mv -Tf -- "${temp_link}" "${current_link}"
 
-  start_martin
+  refresh_martin
 
   log "running smoke tests"
   if ! "${SCRIPT_DIR}/smoke-test.sh" >/dev/null; then
@@ -119,7 +120,7 @@ main() {
       log "smoke tests failed; rolling back published symlink"
       ln -sfn "${previous_relative_target}" "${temp_link}"
       mv -Tf -- "${temp_link}" "${current_link}"
-      start_martin || true
+      refresh_martin || true
     fi
     die "smoke tests failed after publish"
   fi
