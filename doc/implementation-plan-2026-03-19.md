@@ -2,6 +2,8 @@
 
 Date: 2026-03-19
 
+Status: Historical bootstrap plan. The current requirements have since expanded to include multiple Martin catalogue entries, multiple style sources, and command-line control of Martin's embedded UI. See `doc/map-pipeline-requirements.md` for the current target behavior.
+
 ## Goal
 
 Turn the repository from a stub into a reproducible single-node tile build and serving pipeline that:
