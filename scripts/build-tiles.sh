@@ -6,22 +6,34 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/common.sh"
 
 usage() {
   cat >&2 <<'EOF'
-Usage: ./scripts/build-tiles.sh [--tile-format mvt|mlt] [--mlt] <path-to.osm.pbf>
+Usage: ./scripts/build-tiles.sh [--catalogue NAME] [--tile-format mvt|mlt] [--mlt] <path-to.osm.pbf>
 
-Builds a versioned MBTiles artifact under data/build/ using Planetiler in Docker.
+Builds a versioned MBTiles artifact under data/build/<catalogue>/ using Planetiler in Docker.
 
 Options:
+  --catalogue NAME     Catalogue to build for. Default: DEFAULT_CATALOGUE or basemap.
+  --catalog NAME       Alias for --catalogue.
   --tile-format FORMAT  Output tile payload format. Supported: mvt, mlt.
   --mlt                 Shortcut for --tile-format mlt.
 EOF
 }
 
 parse_args() {
+  BUILD_CATALOGUE="${DEFAULT_CATALOGUE}"
   TILE_FORMAT="mvt"
   BUILD_INPUT_ARG=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --catalogue|--catalog)
+        [[ $# -ge 2 ]] || die "missing value for $1"
+        BUILD_CATALOGUE="$2"
+        shift 2
+        ;;
+      --catalogue=*|--catalog=*)
+        BUILD_CATALOGUE="${1#*=}"
+        shift
+        ;;
       --tile-format)
         [[ $# -ge 2 ]] || die "missing value for --tile-format"
         TILE_FORMAT="$2"
@@ -66,6 +78,8 @@ parse_args() {
     *) die "unsupported tile format: ${TILE_FORMAT} (expected mvt or mlt)" ;;
   esac
 
+  validate_catalogue_name "${BUILD_CATALOGUE}"
+
   [[ -n "${BUILD_INPUT_ARG}" ]] || {
     usage
     exit 1
@@ -92,7 +106,9 @@ main() {
   local base_name
   local timestamp
   local output_name
+  local output_dir
   local output_path
+  local container_output_path
   local docker_args=()
 
   input_dir=$(dirname -- "${input_path}")
@@ -100,10 +116,13 @@ main() {
   base_name=${input_name%.osm.pbf}
   timestamp=$(date -u +%Y%m%dT%H%M%SZ)
   output_name="${base_name}-${timestamp}.mbtiles"
-  output_path="${DATA_BUILD_DIR}/${output_name}"
+  ensure_catalogue_directories "${BUILD_CATALOGUE}"
+  output_dir=$(catalogue_build_dir "${BUILD_CATALOGUE}")
+  output_path="${output_dir}/${output_name}"
+  container_output_path="/workspace/data/build/${BUILD_CATALOGUE}/${output_name}"
 
   docker_args+=(--osm-path="/input/${input_name}")
-  docker_args+=(--output="/workspace/data/build/${output_name}")
+  docker_args+=(--output="${container_output_path}")
   docker_args+=(--tmpdir="/workspace/data/cache/planetiler/tmp")
   docker_args+=(--download-dir="/workspace/data/cache/planetiler/downloads")
   docker_args+=(--storage="${PLANETILER_STORAGE}")
@@ -117,7 +136,7 @@ main() {
 
   build_planetiler_runtime_image
 
-  log "building ${output_name} from ${input_path} with tile format ${TILE_FORMAT}"
+  log "building ${output_name} for catalogue ${BUILD_CATALOGUE} from ${input_path} with tile format ${TILE_FORMAT}"
 
   docker run --rm \
     -e "JAVA_TOOL_OPTIONS=-Xmx${PLANETILER_JAVA_XMX}" \
