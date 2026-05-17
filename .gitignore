@@ -1,4 +1,3 @@
-.DS_Store
 *.log
 
 data/build/*
@@ -13,4 +12,8 @@ data/incoming/*
 data/published/*
 !data/published/.gitkeep
 
+data/styles/*
+!data/styles/.gitkeep
+
 docker-compose.override.yml
+/.env
