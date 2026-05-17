@@ -14,5 +14,5 @@ services:
     restart: unless-stopped
     user: "65534:65534"
     volumes:
-      - ./martin/config.yaml:/etc/martin/config.yaml:ro
+      - ./data/martin/config.yaml:/etc/martin/config.yaml:ro
       - ./data:/data:ro

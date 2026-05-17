@@ -146,12 +146,26 @@
       }
     },
     {
-      "id": "transportation-casing",
+      "id": "transportation-construction",
       "type": "line",
       "source": "basemap",
       "source-layer": "transportation",
+      "filter": [
+        "in",
+        "class",
+        "motorway_construction",
+        "trunk_construction",
+        "primary_construction",
+        "secondary_construction",
+        "tertiary_construction",
+        "minor_construction",
+        "path_construction",
+        "service_construction",
+        "track_construction",
+        "raceway_construction"
+      ],
       "paint": {
-        "line-color": "#c9b89d",
+        "line-color": "#9d9a92",
         "line-width": [
           "interpolate",
           [
@@ -160,20 +174,235 @@
           [
             "zoom"
           ],
-          4,
-          0.6,
-          10,
-          2,
+          6,
+          0.7,
+          12,
+          2.2,
           14,
-          5.5
+          4
+        ],
+        "line-dasharray": [
+          2,
+          1.4
         ]
       }
     },
     {
-      "id": "transportation",
+      "id": "transportation-ferry",
       "type": "line",
       "source": "basemap",
       "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "ferry"
+      ],
+      "paint": {
+        "line-color": "#3f93c5",
+        "line-width": 1,
+        "line-dasharray": [
+          4,
+          2
+        ]
+      }
+    },
+    {
+      "id": "transportation-track",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "track"
+      ],
+      "paint": {
+        "line-color": "#9b6a36",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          0.8,
+          14,
+          2.1
+        ],
+        "line-dasharray": [
+          3,
+          2
+        ]
+      }
+    },
+    {
+      "id": "transportation-pedestrian",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        "subclass",
+        "pedestrian",
+        "path",
+        "footway",
+        "corridor"
+      ],
+      "paint": {
+        "line-color": "#3f9d5a",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0.8,
+          15,
+          2.2
+        ],
+        "line-dasharray": [
+          2.4,
+          1.6
+        ]
+      }
+    },
+    {
+      "id": "transportation-cycleway",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "subclass",
+        "cycleway"
+      ],
+      "paint": {
+        "line-color": "#2674d8",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0.9,
+          15,
+          2.4
+        ],
+        "line-dasharray": [
+          1.2,
+          1.2
+        ]
+      }
+    },
+    {
+      "id": "transportation-bridleway",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "subclass",
+        "bridleway"
+      ],
+      "paint": {
+        "line-color": "#7b4faf",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0.9,
+          15,
+          2.2
+        ],
+        "line-dasharray": [
+          3,
+          1.4
+        ]
+      }
+    },
+    {
+      "id": "transportation-steps",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "subclass",
+        "steps"
+      ],
+      "paint": {
+        "line-color": "#333333",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          0.8,
+          16,
+          2
+        ],
+        "line-dasharray": [
+          0.5,
+          1
+        ]
+      }
+    },
+    {
+      "id": "transportation-minor-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        "class",
+        "minor",
+        "service"
+      ],
+      "paint": {
+        "line-color": "#c8c1b4",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          0.9,
+          14,
+          4.2
+        ]
+      }
+    },
+    {
+      "id": "transportation-minor",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        "class",
+        "minor",
+        "service"
+      ],
       "paint": {
         "line-color": "#ffffff",
         "line-width": [
@@ -184,12 +413,416 @@
           [
             "zoom"
           ],
-          4,
-          0.3,
           10,
-          1.2,
+          0.5,
           14,
-          4
+          2.8
+        ]
+      }
+    },
+    {
+      "id": "transportation-tertiary-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "tertiary"
+      ],
+      "paint": {
+        "line-color": "#d1a34f",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          7,
+          0.9,
+          12,
+          3,
+          14,
+          6
+        ]
+      }
+    },
+    {
+      "id": "transportation-tertiary",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "tertiary"
+      ],
+      "paint": {
+        "line-color": "#ffe7a8",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          7,
+          0.5,
+          12,
+          2,
+          14,
+          4.2
+        ]
+      }
+    },
+    {
+      "id": "transportation-secondary-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "secondary"
+      ],
+      "paint": {
+        "line-color": "#d18a3e",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          7,
+          1,
+          12,
+          3.4,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "transportation-secondary",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "secondary"
+      ],
+      "paint": {
+        "line-color": "#ffd782",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          7,
+          0.6,
+          12,
+          2.3,
+          14,
+          4.8
+        ]
+      }
+    },
+    {
+      "id": "transportation-primary-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "primary"
+      ],
+      "paint": {
+        "line-color": "#c86f34",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          6,
+          1.2,
+          12,
+          4,
+          14,
+          8
+        ]
+      }
+    },
+    {
+      "id": "transportation-primary",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "primary"
+      ],
+      "paint": {
+        "line-color": "#ffc25a",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          6,
+          0.8,
+          12,
+          2.8,
+          14,
+          5.8
+        ]
+      }
+    },
+    {
+      "id": "transportation-trunk-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "trunk"
+      ],
+      "paint": {
+        "line-color": "#b95b34",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          1.4,
+          10,
+          4.2,
+          14,
+          9.5
+        ]
+      }
+    },
+    {
+      "id": "transportation-trunk",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "trunk"
+      ],
+      "paint": {
+        "line-color": "#f8a150",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          0.9,
+          10,
+          3,
+          14,
+          7
+        ]
+      }
+    },
+    {
+      "id": "transportation-motorway-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "motorway"
+      ],
+      "paint": {
+        "line-color": "#a94734",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          3.4,
+          10,
+          6.2,
+          14,
+          11.5
+        ]
+      }
+    },
+    {
+      "id": "transportation-motorway",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "==",
+        "class",
+        "motorway"
+      ],
+      "paint": {
+        "line-color": "#f07f45",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          2.9,
+          10,
+          5,
+          14,
+          9
+        ]
+      }
+    },
+    {
+      "id": "transportation-rail-base",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        "subclass",
+        "rail",
+        "narrow_gauge",
+        "preserved",
+        "funicular",
+        "subway",
+        "light_rail",
+        "monorail",
+        "tram"
+      ],
+      "paint": {
+        "line-color": "#ffffff",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          6,
+          1,
+          12,
+          2.2,
+          14,
+          3.4
+        ]
+      }
+    },
+    {
+      "id": "transportation-rail-dash",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "in",
+        "subclass",
+        "rail",
+        "narrow_gauge",
+        "preserved",
+        "funicular",
+        "subway",
+        "light_rail",
+        "monorail",
+        "tram"
+      ],
+      "paint": {
+        "line-color": "#111111",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          6,
+          0.7,
+          12,
+          1.4,
+          14,
+          2.2
+        ],
+        "line-dasharray": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": "transportation-public-transport",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "filter": [
+        "any",
+        [
+          "in",
+          "class",
+          "busway",
+          "bus_guideway"
+        ],
+        [
+          "in",
+          "subclass",
+          "tram",
+          "subway",
+          "light_rail",
+          "monorail",
+          "platform"
+        ]
+      ],
+      "paint": {
+        "line-color": "#050505",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          8,
+          0.6,
+          14,
+          1.4
         ]
       }
     },
@@ -206,11 +839,63 @@
       }
     },
     {
+      "id": "mountain-peak-cliff",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "mountain_peak",
+      "minzoom": 10,
+      "filter": [
+        "all",
+        [
+          "==",
+          [
+            "geometry-type"
+          ],
+          "LineString"
+        ],
+        [
+          "==",
+          [
+            "get",
+            "class"
+          ],
+          "cliff"
+        ]
+      ],
+      "paint": {
+        "line-color": "#5d5149",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          0.7,
+          14,
+          1.8
+        ],
+        "line-dasharray": [
+          1.5,
+          0.8
+        ]
+      }
+    },
+    {
       "id": "mountain-peak-dot",
       "type": "circle",
       "source": "basemap",
       "source-layer": "mountain_peak",
       "minzoom": 7,
+      "filter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "Point"
+      ],
       "paint": {
         "circle-radius": [
           "interpolate",
@@ -236,6 +921,38 @@
       "source": "basemap",
       "source-layer": "poi",
       "minzoom": 12,
+      "filter": [
+        "all",
+        [
+          "!in",
+          "class",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "!in",
+          "subclass",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "!=",
+          "agg_stop",
+          1
+        ]
+      ],
       "paint": {
         "circle-radius": [
           "interpolate",
@@ -253,6 +970,63 @@
         "circle-color": "#1769e0",
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 0.9
+      }
+    },
+    {
+      "id": "poi-public-transport-dot",
+      "type": "circle",
+      "source": "basemap",
+      "source-layer": "poi",
+      "minzoom": 11,
+      "filter": [
+        "any",
+        [
+          "in",
+          "class",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "in",
+          "subclass",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "==",
+          "agg_stop",
+          1
+        ]
+      ],
+      "paint": {
+        "circle-radius": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          2.4,
+          16,
+          4.6
+        ],
+        "circle-color": "#050505",
+        "circle-stroke-color": "#55d9ff",
+        "circle-stroke-width": 1.4
       }
     },
     {
@@ -447,6 +1221,13 @@
       "source": "basemap",
       "source-layer": "mountain_peak",
       "minzoom": 9,
+      "filter": [
+        "==",
+        [
+          "geometry-type"
+        ],
+        "Point"
+      ],
       "layout": {
         "text-field": [
           "coalesce",
@@ -480,6 +1261,38 @@
       "source": "basemap",
       "source-layer": "poi",
       "minzoom": 13,
+      "filter": [
+        "all",
+        [
+          "!in",
+          "class",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "!in",
+          "subclass",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "!=",
+          "agg_stop",
+          1
+        ]
+      ],
       "layout": {
         "text-field": [
           "get",
@@ -498,6 +1311,76 @@
         "text-color": "#174f9f",
         "text-halo-color": "#ffffff",
         "text-halo-width": 1
+      }
+    },
+    {
+      "id": "poi-public-transport-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "poi",
+      "minzoom": 12,
+      "filter": [
+        "any",
+        [
+          "in",
+          "class",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "in",
+          "subclass",
+          "railway",
+          "station",
+          "halt",
+          "tram_stop",
+          "bus_stop",
+          "subway_entrance",
+          "ferry_terminal",
+          "platform"
+        ],
+        [
+          "==",
+          "agg_stop",
+          1
+        ]
+      ],
+      "layout": {
+        "text-field": [
+          "get",
+          "name"
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          10,
+          16,
+          12
+        ],
+        "text-offset": [
+          0,
+          1.15
+        ]
+      },
+      "paint": {
+        "text-color": "#050505",
+        "text-halo-color": "#e4fbff",
+        "text-halo-width": 1.2
       }
     },
     {

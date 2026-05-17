@@ -8,7 +8,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage: ./scripts/generate-martin-config.sh
 
-Generates martin/config.yaml from:
+Generates data/martin/config.yaml from:
 - data/published/<catalogue>/current.mbtiles
 - data/styles/<catalogue>/*.json
 

@@ -8,7 +8,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage: ./scripts/refresh-martin.sh
 
-Regenerates martin/config.yaml from published catalogues and style files, then refreshes Martin.
+Regenerates data/martin/config.yaml from published catalogues and style files, then refreshes Martin.
 Use this after adding, removing, or editing styles without publishing new MBTiles.
 EOF
 }

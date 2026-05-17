@@ -22,8 +22,6 @@ The default catalogue is `basemap`, but the scripts support any URL-safe catalog
 .
 ├── docker-compose.yml
 ├── doc/
-├── martin/
-│   └── config.yaml
 ├── scripts/
 ├── viewer/
 ├── data/
@@ -33,6 +31,9 @@ The default catalogue is `basemap`, but the scripts support any URL-safe catalog
 │   ├── published/
 │   │   └── <catalogue>/
 │   │       └── current.mbtiles
+│   ├── martin/
+│   │   ├── .gitkeep
+│   │   └── config.yaml  # generated, ignored
 │   ├── styles/
 │   │   └── <catalogue>/
 │   │       ├── default.json
@@ -43,7 +44,7 @@ The default catalogue is `basemap`, but the scripts support any URL-safe catalog
         └── default.json
 ```
 
-`martin/config.yaml` is generated from the published catalogue symlinks and user style files under `data/styles/`. Do not edit it by hand.
+`data/martin/config.yaml` is generated from the published catalogue symlinks and user style files under `data/styles/`. Files under `data/martin/` are ignored by Git except for `data/martin/.gitkeep`.
 
 ## Requirements
 
@@ -178,7 +179,17 @@ Martin serves user-owned style JSON from `data/styles/<catalogue>/*.json`. Files
 
 The committed default template is `templates/styles/default.json`. It uses one source named `basemap`, points to `/basemap` by default, and includes simple render layers for the current Planetiler/OpenMapTiles-compatible layer set. When publish creates `data/styles/<catalogue>/default.json`, it keeps the source key as `basemap`, rewrites the style name, and rewrites only the source URL to `/<catalogue>`.
 
-The default template covers these emitted layers: `aerodrome_label`, `aeroway`, `boundary`, `building`, `housenumber`, `landcover`, `landuse`, `mountain_peak`, `park`, `place`, `poi`, `transportation`, `transportation_name`, `water`, `water_name`, and `waterway`. POIs render as small blue dots with name labels.
+The default template covers these emitted layers: `aerodrome_label`, `aeroway`, `boundary`, `building`, `housenumber`, `landcover`, `landuse`, `mountain_peak`, `park`, `place`, `poi`, `transportation`, `transportation_name`, `water`, `water_name`, and `waterway`.
+
+Transportation styling is intentionally diagnostic:
+
+- major roads use different widths and warm colors by `class`
+- minor and service roads use narrower light lines
+- construction, ferry, track, pedestrian, bicycle, bridleway, and steps are dashed with distinct colors
+- rail-like `subclass` values render as dashed black-over-white lines
+- busway/guideway and transit-like subclasses render as thin black overlays
+- public transport POIs render differently from generic POIs; generic POIs remain small blue dots with labels
+- `mountain_peak` cliff LineStrings render as cliff lines, while point features in that layer render as mountain peak points
 
 Templates used with `--style-template` must be MapLibre style version 8 JSON, define a `sources.basemap` object, and only reference defined sources from layers.
 
@@ -240,7 +251,7 @@ Use this after adding/removing styles or after changing published catalogue fold
 
 The refresh script:
 
-- regenerates `martin/config.yaml`
+- regenerates `data/martin/config.yaml`
 - starts Martin if needed
 - restarts Martin so it reloads catalogue and style registrations
 
@@ -312,6 +323,7 @@ Optional query parameters:
 - `base`: Martin base URL, for example `http://localhost:3000`.
 - `style`: Martin style ID to preselect. If absent or unavailable, the viewer selects `basemap` when present, otherwise the first style in `/catalog`.
 - `debugTiles`: Set to `1` to show tile boundaries, coordinates, and sizes.
+- `inspect`: Set to `0` to disable click inspection. It is enabled by default.
 
 Examples:
 
@@ -319,9 +331,12 @@ Examples:
 http://localhost:8081/?base=http://localhost:3000&style=basemap
 http://localhost:8081/?base=http://localhost:3000&style=berlin
 http://localhost:8081/?base=http://localhost:3000&style=berlin-dark&debugTiles=1
+http://localhost:8081/?base=http://localhost:3000&style=basemap&inspect=0
 ```
 
 `debugTiles=1` enables MapLibre's tile boundary, tile coordinate, and tile size overlay.
+
+When inspection is enabled, clicking the map source-scans the currently loaded vector tiles in the browser, checks points and lines within 8 screen pixels, includes polygons that contain the clicked coordinate, and lists all feature properties in the sidebar. Results depend on the vector tiles currently loaded by MapLibre for the active viewport and zoom.
 
 ## Operational Notes
 

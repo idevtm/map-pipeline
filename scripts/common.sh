@@ -53,10 +53,11 @@ load_env() {
   DATA_INCOMING_DIR="${DATA_DIR}/incoming"
   DATA_BUILD_DIR="${DATA_DIR}/build"
   DATA_PUBLISHED_DIR="${DATA_DIR}/published"
+  DATA_MARTIN_DIR="${DATA_DIR}/martin"
   DATA_CACHE_DIR="${DATA_DIR}/cache"
   PLANETILER_CACHE_DIR="${DATA_CACHE_DIR}/planetiler"
   STYLES_DIR="${DATA_DIR}/styles"
-  MARTIN_CONFIG_PATH="${REPO_ROOT}/martin/config.yaml"
+  MARTIN_CONFIG_PATH="${DATA_MARTIN_DIR}/config.yaml"
 }
 
 ensure_directories() {
@@ -64,6 +65,7 @@ ensure_directories() {
     "${DATA_INCOMING_DIR}" \
     "${DATA_BUILD_DIR}" \
     "${DATA_PUBLISHED_DIR}" \
+    "${DATA_MARTIN_DIR}" \
     "${PLANETILER_CACHE_DIR}/downloads" \
     "${PLANETILER_CACHE_DIR}/tmp" \
     "${STYLES_DIR}"

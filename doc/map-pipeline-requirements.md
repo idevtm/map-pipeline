@@ -55,8 +55,6 @@ map-pipeline/
 ├── .env.example
 ├── .gitignore
 ├── README.md
-├── martin/
-│   └── config.yaml
 ├── scripts/
 │   ├── build-tiles.sh
 │   ├── generate-martin-config.sh
@@ -70,6 +68,9 @@ map-pipeline/
 │   ├── published/
 │   │   └── <catalogue>/
 │   │       └── current.mbtiles -> ../../build/<catalogue>/<artifact>.mbtiles
+│   ├── martin/
+│   │   ├── .gitkeep
+│   │   └── config.yaml  # generated, ignored
 │   ├── styles/
 │   │   └── <catalogue>/
 │   │       ├── default.json
@@ -128,7 +129,12 @@ map-pipeline/
 - Adding or removing a style ID must refresh Martin so `/catalog` reflects the change
 - The default template must cover the current Planetiler/OpenMapTiles-compatible layer set emitted by this pipeline:
   `aerodrome_label`, `aeroway`, `boundary`, `building`, `housenumber`, `landcover`, `landuse`, `mountain_peak`, `park`, `place`, `poi`, `transportation`, `transportation_name`, `water`, `water_name`, and `waterway`
-- The default template must render POIs as small blue dots with name labels
+- The default template must style transportation diagnostically by class/subclass:
+  major roads with differentiated widths/colors, minor/service roads with narrower light lines, construction/ferry/track/pedestrian/bicycle/bridleway/steps as distinct dashed lines, railways as dashed black-over-white lines, and public transport overlays as thin black lines
+- The default template must split public transport POIs from generic POIs
+- The default template must render `mountain_peak` features with `class=cliff` and LineString geometry as lines, while Point geometries in the layer render as points
+- Generic POIs must render as small blue dots with name labels
+- Public transport POIs must render with distinct marker and label styling
 
 ### 4. Atomic Deployment
 
@@ -160,9 +166,14 @@ map-pipeline/
 
 - The local `viewer/index.html` must fetch Martin's `/catalog` endpoint
 - The viewer must present available styles in a dropdown populated from `catalog.styles`
-- The viewer must keep supporting `base`, `style`, and `debugTiles` query parameters
+- The viewer must keep supporting `base`, `style`, `debugTiles`, and `inspect` query parameters
 - If the requested style is unavailable, the viewer must select `basemap` when present, otherwise the first style in `/catalog`
 - If no styles are available, the viewer must disable map loading and show a clear status message
+- The viewer must enable click inspection by default and allow disabling it with `inspect=0`
+- The viewer inspector must source-scan currently loaded vector tiles with `querySourceFeatures`
+- The viewer inspector must include point/line hits within 8 screen pixels and polygon hits containing the clicked coordinate
+- The viewer inspector must display all feature attributes present in the tile, grouped by source layer
+- Viewer inspection is a local debugging aid and is limited to tiles loaded by the browser for the active viewport and zoom
 
 ### 8. Validation
 
@@ -260,8 +271,8 @@ Valid `MARTIN_WEBUI` values:
 
 - Runs continuously
 - Mounts:
-  - config
-  - `data/` read-only, including published tiles and styles
+  - generated config from `data/martin/config.yaml`
+  - `data/` read-only, including generated Martin config, published tiles, and styles
 - Passes Martin web UI state as a command-line argument
 
 Required command shape:
@@ -294,7 +305,7 @@ styles:
 - Each catalogue has its own atomic `current.mbtiles` symlink
 - Style IDs are stable public names and can be grouped by catalogue folder on disk
 - Martin configuration may be maintained directly or generated from the catalogue/style folder structure, but `/catalog` must expose all configured tile and style entries
-- The current implementation generates Martin configuration from published catalogue symlinks and `data/styles/<catalogue>/*.json`
+- The current implementation generates ignored Martin configuration at `data/martin/config.yaml` from published catalogue symlinks and `data/styles/<catalogue>/*.json`
 
 ---
 
@@ -344,7 +355,7 @@ styles:
 ### generate-martin-config.sh
 
 **Responsibility:**
-- Generate `martin/config.yaml` from the on-disk catalogue and style structure
+- Generate `data/martin/config.yaml` from the on-disk catalogue and style structure
 - Validate style JSON before Martin is refreshed
 - Derive style IDs from `data/styles/<catalogue>/<style>.json`
 

@@ -27,7 +27,7 @@ Turn the repository from a stub into a reproducible single-node tile build and s
 
 - Add `.env` and `.env.example` with runtime defaults.
 - Add `docker-compose.yml` for the long-running Martin service.
-- Add `martin/config.yaml` with an explicit stable source name and style registration.
+- Add a Martin config with an explicit stable source name and style registration. This was later moved to generated, ignored `data/martin/config.yaml`.
 
 ### Pipeline Scripts
 

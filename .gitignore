@@ -9,6 +9,9 @@ data/cache/*
 data/incoming/*
 !data/incoming/.gitkeep
 
+data/martin/*
+!data/martin/.gitkeep
+
 data/published/*
 !data/published/.gitkeep
 

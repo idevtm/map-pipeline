@@ -16,12 +16,14 @@
       body {
         margin: 0;
         display: grid;
-        grid-template-columns: 320px 1fr;
+        grid-template-columns: 380px 1fr;
         min-height: 100vh;
       }
 
       aside {
         box-sizing: border-box;
+        height: 100vh;
+        overflow-y: auto;
         padding: 24px;
         background: linear-gradient(180deg, #f9f2dd, #efe7d1);
         border-right: 1px solid rgba(27, 26, 23, 0.12);
@@ -30,6 +32,11 @@
       h1 {
         margin: 0 0 8px;
         font-size: 1.6rem;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 1rem;
       }
 
       p,
@@ -101,8 +108,68 @@
         white-space: pre-wrap;
       }
 
+      .inspect-panel {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(27, 26, 23, 0.16);
+      }
+
+      .inspect-output {
+        font-size: 0.86rem;
+        line-height: 1.35;
+      }
+
+      .inspect-empty,
+      .inspect-coordinate {
+        margin: 0 0 12px;
+        color: rgba(27, 26, 23, 0.72);
+      }
+
+      .inspect-group {
+        margin-top: 10px;
+        border-top: 1px solid rgba(27, 26, 23, 0.12);
+      }
+
+      .inspect-group summary {
+        cursor: pointer;
+        padding: 10px 0;
+        font-weight: 700;
+      }
+
+      .feature-record {
+        padding: 10px 0;
+        border-top: 1px solid rgba(27, 26, 23, 0.08);
+      }
+
+      .feature-meta {
+        margin: 0 0 8px;
+        font-weight: 700;
+      }
+
+      .property-list {
+        display: grid;
+        grid-template-columns: minmax(90px, 35%) 1fr;
+        gap: 4px 10px;
+        margin: 0;
+      }
+
+      .property-key {
+        color: rgba(27, 26, 23, 0.68);
+        overflow-wrap: anywhere;
+      }
+
+      .property-value {
+        margin: 0;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+
       #map {
         min-height: 100vh;
+      }
+
+      #map canvas {
+        cursor: crosshair;
       }
 
       .hint {
@@ -117,6 +184,7 @@
         }
 
         aside {
+          height: auto;
           border-right: 0;
           border-bottom: 1px solid rgba(27, 26, 23, 0.12);
         }
@@ -145,9 +213,19 @@
         <label for="showTileDebug">Show tile borders, numbers, and sizes</label>
       </div>
 
+      <div class="toggle">
+        <input id="enableInspect" type="checkbox" checked>
+        <label for="enableInspect">Inspect clicked features</label>
+      </div>
+
       <button id="reloadButton" type="button">Reload Map</button>
 
       <div id="status">Waiting for map load.</div>
+
+      <section id="inspectPanel" class="inspect-panel">
+        <h2>Feature Inspector</h2>
+        <div id="inspectOutput" class="inspect-output">Click the map to inspect loaded tile features.</div>
+      </section>
 
       <p class="hint">
         Serve this directory locally, for example:
@@ -163,9 +241,12 @@
       const martinBaseInput = document.getElementById("martinBase");
       const styleSelect = document.getElementById("styleId");
       const showTileDebugInput = document.getElementById("showTileDebug");
+      const enableInspectInput = document.getElementById("enableInspect");
       const reloadButton = document.getElementById("reloadButton");
+      const inspectOutput = document.getElementById("inspectOutput");
       const params = new URLSearchParams(window.location.search);
       const requestedStyleId = params.get("style") || "";
+      const HIT_TOLERANCE_PIXELS = 8;
 
       if (params.get("base")) {
         martinBaseInput.value = params.get("base");
@@ -173,9 +254,14 @@
       if (params.get("debugTiles") === "1") {
         showTileDebugInput.checked = true;
       }
+      if (params.get("inspect") === "0") {
+        enableInspectInput.checked = false;
+      }
 
       let map;
       let selectedStyleId = requestedStyleId;
+      let currentStyle;
+      let vectorSourceMetadata = {};
 
       function setStatus(message) {
         statusNode.textContent = message;
@@ -227,13 +313,33 @@
         return populateStyleSelect(catalog.styles || {}, preferredStyleId);
       }
 
-      async function normalizeVectorSource(baseUrl, source) {
+      function styleSourceLayers(style, sourceId) {
+        return Array.from(
+          new Set(
+            (style.layers || [])
+              .filter((layer) => layer.source === sourceId && layer["source-layer"])
+              .map((layer) => layer["source-layer"])
+          )
+        ).sort((left, right) => left.localeCompare(right));
+      }
+
+      async function normalizeVectorSource(baseUrl, sourceId, source) {
         if (!source || source.type !== "vector" || typeof source.url !== "string") {
           return source;
         }
 
         const tileJsonUrl = source.url.startsWith("/") ? `${baseUrl}${source.url}` : source.url;
         const tileJson = await fetchJson(tileJsonUrl);
+        const sourceLayers = Array.isArray(tileJson.vector_layers)
+          ? tileJson.vector_layers
+              .map((layer) => layer && layer.id)
+              .filter((layerId) => typeof layerId === "string" && layerId.length > 0)
+          : [];
+
+        vectorSourceMetadata[sourceId] = {
+          sourceLayers,
+          tileJson
+        };
 
         if (tileJson.format === "application/vnd.maplibre-vector-tile") {
           source.encoding = "mlt";
@@ -243,6 +349,7 @@
       }
 
       async function loadStyle(baseUrl, styleId) {
+        vectorSourceMetadata = {};
         const style = await fetchJson(`${baseUrl}/style/${styleId}`);
         for (const source of Object.values(style.sources || {})) {
           if (source && typeof source.url === "string" && source.url.startsWith("/")) {
@@ -251,10 +358,364 @@
         }
 
         await Promise.all(
-          Object.values(style.sources || {}).map((source) => normalizeVectorSource(baseUrl, source))
+          Object.entries(style.sources || {}).map(([sourceId, source]) =>
+            normalizeVectorSource(baseUrl, sourceId, source)
+          )
         );
 
+        for (const [sourceId, source] of Object.entries(style.sources || {})) {
+          if (!source || source.type !== "vector") {
+            continue;
+          }
+
+          const metadata = vectorSourceMetadata[sourceId] || { sourceLayers: [], tileJson: {} };
+          if (!metadata.sourceLayers.length) {
+            metadata.sourceLayers = styleSourceLayers(style, sourceId);
+          }
+          vectorSourceMetadata[sourceId] = metadata;
+        }
+
+        currentStyle = style;
         return style;
+      }
+
+      function setInspectionMessage(message) {
+        inspectOutput.replaceChildren();
+        const node = document.createElement("p");
+        node.className = "inspect-empty";
+        node.textContent = message;
+        inspectOutput.append(node);
+      }
+
+      function isCoordinate(value) {
+        return Array.isArray(value)
+          && value.length >= 2
+          && Number.isFinite(Number(value[0]))
+          && Number.isFinite(Number(value[1]));
+      }
+
+      function projectedDistanceToPoint(coordinate, clickPoint) {
+        if (!isCoordinate(coordinate)) {
+          return Infinity;
+        }
+
+        const point = map.project([Number(coordinate[0]), Number(coordinate[1])]);
+        return Math.hypot(point.x - clickPoint.x, point.y - clickPoint.y);
+      }
+
+      function distanceToSegment(point, start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+
+        if (dx === 0 && dy === 0) {
+          return Math.hypot(point.x - start.x, point.y - start.y);
+        }
+
+        const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+        const projection = {
+          x: start.x + t * dx,
+          y: start.y + t * dy
+        };
+
+        return Math.hypot(point.x - projection.x, point.y - projection.y);
+      }
+
+      function lineDistance(coordinates, clickPoint) {
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          return Infinity;
+        }
+
+        let nearest = Infinity;
+        for (let index = 1; index < coordinates.length; index += 1) {
+          if (!isCoordinate(coordinates[index - 1]) || !isCoordinate(coordinates[index])) {
+            continue;
+          }
+
+          const start = map.project([Number(coordinates[index - 1][0]), Number(coordinates[index - 1][1])]);
+          const end = map.project([Number(coordinates[index][0]), Number(coordinates[index][1])]);
+          nearest = Math.min(nearest, distanceToSegment(clickPoint, start, end));
+        }
+
+        return nearest;
+      }
+
+      function ringContainsPoint(coordinate, ring) {
+        if (!Array.isArray(ring) || ring.length < 4) {
+          return false;
+        }
+
+        const x = coordinate[0];
+        const y = coordinate[1];
+        let inside = false;
+
+        for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index, index += 1) {
+          const currentPoint = ring[index];
+          const previousPoint = ring[previous];
+          if (!isCoordinate(currentPoint) || !isCoordinate(previousPoint)) {
+            continue;
+          }
+
+          const xi = Number(currentPoint[0]);
+          const yi = Number(currentPoint[1]);
+          const xj = Number(previousPoint[0]);
+          const yj = Number(previousPoint[1]);
+          const crosses = (yi > y) !== (yj > y);
+          const intersects = crosses && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+          if (intersects) {
+            inside = !inside;
+          }
+        }
+
+        return inside;
+      }
+
+      function polygonContainsPoint(coordinate, polygon) {
+        if (!Array.isArray(polygon) || !polygon.length || !ringContainsPoint(coordinate, polygon[0])) {
+          return false;
+        }
+
+        for (let ringIndex = 1; ringIndex < polygon.length; ringIndex += 1) {
+          if (ringContainsPoint(coordinate, polygon[ringIndex])) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      function hitTestGeometry(geometry, event) {
+        if (!geometry || !geometry.type) {
+          return null;
+        }
+
+        const clickPoint = event.point;
+        const clickCoordinate = [event.lngLat.lng, event.lngLat.lat];
+
+        switch (geometry.type) {
+          case "Point": {
+            const distance = projectedDistanceToPoint(geometry.coordinates, clickPoint);
+            return distance <= HIT_TOLERANCE_PIXELS ? { reason: `point within ${Math.round(distance)} px` } : null;
+          }
+          case "MultiPoint": {
+            const distances = (geometry.coordinates || []).map((coordinate) => projectedDistanceToPoint(coordinate, clickPoint));
+            const distance = Math.min(...distances);
+            return distance <= HIT_TOLERANCE_PIXELS ? { reason: `point within ${Math.round(distance)} px` } : null;
+          }
+          case "LineString": {
+            const distance = lineDistance(geometry.coordinates, clickPoint);
+            return distance <= HIT_TOLERANCE_PIXELS ? { reason: `line within ${Math.round(distance)} px` } : null;
+          }
+          case "MultiLineString": {
+            const distances = (geometry.coordinates || []).map((line) => lineDistance(line, clickPoint));
+            const distance = Math.min(...distances);
+            return distance <= HIT_TOLERANCE_PIXELS ? { reason: `line within ${Math.round(distance)} px` } : null;
+          }
+          case "Polygon":
+            return polygonContainsPoint(clickCoordinate, geometry.coordinates) ? { reason: "polygon contains click" } : null;
+          case "MultiPolygon":
+            return (geometry.coordinates || []).some((polygon) => polygonContainsPoint(clickCoordinate, polygon))
+              ? { reason: "polygon contains click" }
+              : null;
+          default:
+            return null;
+        }
+      }
+
+      function stableStringify(value) {
+        if (value === null || typeof value !== "object") {
+          return JSON.stringify(value);
+        }
+
+        if (Array.isArray(value)) {
+          return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+        }
+
+        return `{${Object.keys(value)
+          .sort((left, right) => left.localeCompare(right))
+          .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+          .join(",")}}`;
+      }
+
+      function featureKey(sourceId, sourceLayer, feature) {
+        return [
+          sourceId,
+          sourceLayer,
+          feature.geometry && feature.geometry.type,
+          feature.id ?? "",
+          stableStringify(feature.properties || {})
+        ].join("|");
+      }
+
+      function geometryRank(feature) {
+        const type = feature.geometry && feature.geometry.type;
+        if (type === "Polygon" || type === "MultiPolygon") {
+          return 0;
+        }
+        if (type === "Point" || type === "MultiPoint") {
+          return 1;
+        }
+        return 2;
+      }
+
+      function formatPropertyValue(value) {
+        if (value === null) {
+          return "null";
+        }
+        if (value === undefined) {
+          return "undefined";
+        }
+        if (typeof value === "object") {
+          return JSON.stringify(value);
+        }
+        return String(value);
+      }
+
+      function renderFeatureRecord(match) {
+        const feature = match.feature;
+        const properties = feature.properties || {};
+        const record = document.createElement("div");
+        record.className = "feature-record";
+
+        const meta = document.createElement("p");
+        meta.className = "feature-meta";
+        meta.textContent = [
+          feature.geometry && feature.geometry.type ? feature.geometry.type : "Feature",
+          feature.id !== undefined ? `id ${feature.id}` : "",
+          match.reason
+        ].filter(Boolean).join(" · ");
+        record.append(meta);
+
+        const list = document.createElement("dl");
+        list.className = "property-list";
+
+        const fixedProperties = {
+          source: match.sourceId,
+          sourceLayer: match.sourceLayer
+        };
+
+        for (const [key, value] of Object.entries(fixedProperties)) {
+          const term = document.createElement("dt");
+          term.className = "property-key";
+          term.textContent = key;
+          const description = document.createElement("dd");
+          description.className = "property-value";
+          description.textContent = formatPropertyValue(value);
+          list.append(term, description);
+        }
+
+        for (const key of Object.keys(properties).sort((left, right) => left.localeCompare(right))) {
+          const term = document.createElement("dt");
+          term.className = "property-key";
+          term.textContent = key;
+          const description = document.createElement("dd");
+          description.className = "property-value";
+          description.textContent = formatPropertyValue(properties[key]);
+          list.append(term, description);
+        }
+
+        if (!Object.keys(properties).length) {
+          const term = document.createElement("dt");
+          term.className = "property-key";
+          term.textContent = "properties";
+          const description = document.createElement("dd");
+          description.className = "property-value";
+          description.textContent = "none";
+          list.append(term, description);
+        }
+
+        record.append(list);
+        return record;
+      }
+
+      function renderInspectionResults(event, matches) {
+        inspectOutput.replaceChildren();
+
+        const coordinate = document.createElement("p");
+        coordinate.className = "inspect-coordinate";
+        coordinate.textContent = `Clicked ${event.lngLat.lng.toFixed(6)}, ${event.lngLat.lat.toFixed(6)}.`;
+        inspectOutput.append(coordinate);
+
+        if (!matches.length) {
+          const empty = document.createElement("p");
+          empty.className = "inspect-empty";
+          empty.textContent = "No loaded tile features at this point.";
+          inspectOutput.append(empty);
+          return;
+        }
+
+        matches.sort((left, right) =>
+          left.sourceLayer.localeCompare(right.sourceLayer)
+          || geometryRank(left.feature) - geometryRank(right.feature)
+          || stableStringify(left.feature.properties || {}).localeCompare(stableStringify(right.feature.properties || {}))
+        );
+
+        const grouped = new Map();
+        for (const match of matches) {
+          const groupKey = `${match.sourceId}/${match.sourceLayer}`;
+          if (!grouped.has(groupKey)) {
+            grouped.set(groupKey, []);
+          }
+          grouped.get(groupKey).push(match);
+        }
+
+        for (const [groupKey, groupMatches] of grouped) {
+          const details = document.createElement("details");
+          details.className = "inspect-group";
+          details.open = true;
+
+          const summary = document.createElement("summary");
+          summary.textContent = `${groupKey} (${groupMatches.length})`;
+          details.append(summary);
+
+          for (const match of groupMatches) {
+            details.append(renderFeatureRecord(match));
+          }
+
+          inspectOutput.append(details);
+        }
+      }
+
+      function inspectClick(event) {
+        if (!enableInspectInput.checked || !map || !currentStyle) {
+          return;
+        }
+
+        const matches = [];
+        const seen = new Set();
+
+        for (const [sourceId, metadata] of Object.entries(vectorSourceMetadata)) {
+          for (const sourceLayer of metadata.sourceLayers || []) {
+            let features = [];
+            try {
+              features = map.querySourceFeatures(sourceId, { sourceLayer });
+            } catch (error) {
+              continue;
+            }
+
+            for (const feature of features) {
+              const hit = hitTestGeometry(feature.geometry, event);
+              if (!hit) {
+                continue;
+              }
+
+              const key = featureKey(sourceId, sourceLayer, feature);
+              if (seen.has(key)) {
+                continue;
+              }
+
+              seen.add(key);
+              matches.push({
+                feature,
+                sourceId,
+                sourceLayer,
+                reason: hit.reason
+              });
+            }
+          }
+        }
+
+        renderInspectionResults(event, matches);
       }
 
       async function render() {
@@ -267,7 +728,10 @@
             map.remove();
             map = undefined;
           }
+          currentStyle = undefined;
+          vectorSourceMetadata = {};
           setStatus(`No styles are available from ${baseUrl}/catalog.`);
+          setInspectionMessage(`No styles are available from ${baseUrl}/catalog.`);
           return;
         }
 
@@ -293,14 +757,21 @@
         map.showTileBoundaries = showTileDebug;
 
         map.addControl(new maplibregl.NavigationControl(), "top-right");
+        map.on("click", inspectClick);
         map.on("load", () => {
           setStatus(
-            `Loaded ${styleId} from ${baseUrl}${showTileDebug ? "\nTile debug overlay enabled." : ""}`
+            `Loaded ${styleId} from ${baseUrl}${showTileDebug ? "\nTile debug overlay enabled." : ""}${enableInspectInput.checked ? "\nClick inspection enabled." : ""}`
+          );
+          setInspectionMessage(
+            enableInspectInput.checked
+              ? "Click the map to inspect loaded tile features."
+              : "Click inspection disabled."
           );
           const url = new URL(window.location.href);
           url.searchParams.set("base", baseUrl);
           url.searchParams.set("style", styleId);
           url.searchParams.set("debugTiles", showTileDebug ? "1" : "0");
+          url.searchParams.set("inspect", enableInspectInput.checked ? "1" : "0");
           window.history.replaceState({}, "", url);
         });
         map.on("error", (event) => {
@@ -333,6 +804,17 @@
               : "Tile debug overlay disabled."
           );
         }
+      });
+
+      enableInspectInput.addEventListener("change", () => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("inspect", enableInspectInput.checked ? "1" : "0");
+        window.history.replaceState({}, "", url);
+        setInspectionMessage(
+          enableInspectInput.checked
+            ? "Click the map to inspect loaded tile features."
+            : "Click inspection disabled."
+        );
       });
 
       refreshStyleOptions(martinBaseInput.value.replace(/\/$/, ""), requestedStyleId)
