@@ -7,6 +7,8 @@ services:
     command:
       - --config
       - /etc/martin/config.yaml
+      - --webui
+      - "${MARTIN_WEBUI:-enable-for-all}"
     ports:
       - "${MARTIN_PORT:-3000}:3000"
     restart: unless-stopped
@@ -14,4 +16,3 @@ services:
     volumes:
       - ./martin/config.yaml:/etc/martin/config.yaml:ro
       - ./data:/data:ro
-      - ./styles:/styles:ro

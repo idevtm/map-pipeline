@@ -59,7 +59,9 @@ map-pipeline/
 │   └── config.yaml
 ├── scripts/
 │   ├── build-tiles.sh
+│   ├── generate-martin-config.sh
 │   ├── publish-tiles.sh
+│   ├── refresh-martin.sh
 │   └── rebuild-and-publish.sh
 ├── data/
 │   ├── incoming/
@@ -68,11 +70,14 @@ map-pipeline/
 │   ├── published/
 │   │   └── <catalogue>/
 │   │       └── current.mbtiles -> ../../build/<catalogue>/<artifact>.mbtiles
+│   ├── styles/
+│   │   └── <catalogue>/
+│   │       ├── default.json
+│   │       └── labels.json
 │   └── cache/
-└── styles/
-    └── <catalogue>/
-        ├── default.json
-        └── labels.json
+└── templates/
+    └── styles/
+        └── default.json
 ```
 
 ---
@@ -109,10 +114,21 @@ map-pipeline/
 - Martin must serve MapLibre style JSON files via `/style/<style_id>`
 - Multiple styles per catalogue must be supported
 - Style IDs are globally visible in Martin's style catalogue and must be unique
+- Style files are user data under `data/styles/<catalogue>/` and must not be committed, except `data/styles/.gitkeep`
+- The repository keeps only reusable style templates under `templates/styles/`
+- The repository must include `templates/styles/default.json` as the canonical default style template
+- Publishing a catalogue must create `data/styles/<catalogue>/default.json` from the default template when missing, unless disabled by command-line option
+- Auto-created default styles must keep the style source key `basemap` and rewrite the source URL to the target `/<catalogue>`
+- Auto-created default styles must rewrite the style name to reflect the target catalogue
+- Existing user-owned default styles must not be overwritten by publish
+- Auto-created default styles must be written atomically through a same-directory temporary file and rename
 - Style files may be grouped by catalogue on disk even when the public style IDs are flat
 - Each style must reference one or more configured catalogue sources
 - A style update must not require rebuilding MBTiles
 - Adding or removing a style ID must refresh Martin so `/catalog` reflects the change
+- The default template must cover the current Planetiler/OpenMapTiles-compatible layer set emitted by this pipeline:
+  `aerodrome_label`, `aeroway`, `boundary`, `building`, `housenumber`, `landcover`, `landuse`, `mountain_peak`, `park`, `place`, `poi`, `transportation`, `transportation_name`, `water`, `water_name`, and `waterway`
+- The default template must render POIs as small blue dots with name labels
 
 ### 4. Atomic Deployment
 
@@ -140,17 +156,27 @@ map-pipeline/
 - The Docker Compose configuration should expose this as an environment-controlled command argument
 - The UI is available at `/` when enabled and should be documented as an operational dashboard, not as the primary production client
 
-### 7. Validation
+### 7. Local Viewer
+
+- The local `viewer/index.html` must fetch Martin's `/catalog` endpoint
+- The viewer must present available styles in a dropdown populated from `catalog.styles`
+- The viewer must keep supporting `base`, `style`, and `debugTiles` query parameters
+- If the requested style is unavailable, the viewer must select `basemap` when present, otherwise the first style in `/catalog`
+- If no styles are available, the viewer must disable map loading and show a clear status message
+
+### 8. Validation
 
 Before publishing:
 - Verify MBTiles integrity:
   - SQLite accessible
   - metadata present
 - Verify target catalogue name is valid
+- Verify selected style template JSON before auto-creating a default style
+- Verify selected style template is MapLibre style version 8 and defines `sources.basemap`
 - Verify style JSON is valid when styles are added or changed
 - Verify style source references point at configured catalogue names
 
-### 8. Repeatability
+### 9. Repeatability
 
 Pipeline must support:
 - Running multiple times with different inputs
@@ -190,6 +216,8 @@ Pipeline must support:
 
 - Ubuntu 20.04+
 - Docker + Docker Compose
+- `sqlite3`
+- `python3`
 - Minimum:
   - 16 GB RAM (recommended)
   - SSD storage
@@ -198,7 +226,7 @@ Pipeline must support:
 
 ```bash
 sudo apt update
-sudo apt install docker.io docker-compose-plugin -y
+sudo apt install docker.io docker-compose-plugin sqlite3 python3 -y
 sudo usermod -aG docker $USER
 ```
 
@@ -212,6 +240,7 @@ sudo usermod -aG docker $USER
 MARTIN_PORT=3000
 MARTIN_WEBUI=enable-for-all
 PLANETILER_JAVA_XMX=8g
+PLANETILER_STORAGE=mmap
 DEFAULT_CATALOGUE=basemap
 BUILD_RETENTION=3
 ```
@@ -232,8 +261,7 @@ Valid `MARTIN_WEBUI` values:
 - Runs continuously
 - Mounts:
   - config
-  - published tiles
-  - styles
+  - `data/` read-only, including published tiles and styles
 - Passes Martin web UI state as a command-line argument
 
 Required command shape:
@@ -254,9 +282,9 @@ mbtiles:
 
 styles:
   sources:
-    basemap: /styles/basemap/default.json
-    basemap-labels: /styles/basemap/labels.json
-    berlin: /styles/berlin/default.json
+    basemap: /data/styles/basemap/default.json
+    basemap-labels: /data/styles/basemap/labels.json
+    berlin: /data/styles/berlin/default.json
 ```
 
 ### Key Design Decision
@@ -266,6 +294,7 @@ styles:
 - Each catalogue has its own atomic `current.mbtiles` symlink
 - Style IDs are stable public names and can be grouped by catalogue folder on disk
 - Martin configuration may be maintained directly or generated from the catalogue/style folder structure, but `/catalog` must expose all configured tile and style entries
+- The current implementation generates Martin configuration from published catalogue symlinks and `data/styles/<catalogue>/*.json`
 
 ---
 
@@ -291,16 +320,52 @@ styles:
 
 **Responsibility:**
 - Validate MBTiles
+- Create a default style for the catalogue when missing
 - Update the target catalogue symlink
 - Refresh Martin
+
+**Input options:**
+- `--catalogue <name>` or equivalent
+- `--style-template <path>` to choose the template used for auto-created `default.json`
+- `--no-style-template` to skip automatic style creation
 
 **Steps:**
 1. Validate SQLite metadata
 2. Validate or create target catalogue directory
 3. Create temp symlink
 4. Atomic rename → `data/published/<catalogue>/current.mbtiles`
-5. Refresh Martin
-6. Run smoke tests for the affected catalogue and registered styles
+5. Create `data/styles/<catalogue>/default.json` from the selected template if missing
+6. Refresh Martin
+7. Run smoke tests for the affected catalogue and registered styles
+8. On smoke-test failure, roll back the catalogue symlink and remove only the style file auto-created during that failed publish
+
+---
+
+### generate-martin-config.sh
+
+**Responsibility:**
+- Generate `martin/config.yaml` from the on-disk catalogue and style structure
+- Validate style JSON before Martin is refreshed
+- Derive style IDs from `data/styles/<catalogue>/<style>.json`
+
+**Examples:**
+- `data/styles/basemap/default.json` becomes `/style/basemap`
+- `data/styles/basemap/labels.json` becomes `/style/basemap-labels`
+- `data/styles/berlin/dark.json` becomes `/style/berlin-dark`
+
+---
+
+### refresh-martin.sh
+
+**Responsibility:**
+- Regenerate Martin configuration
+- Start Martin if needed
+- Restart Martin so catalogue and style changes are visible
+
+**Use cases:**
+- Adding a new style file
+- Removing a style file
+- Manually arranging published catalogue symlinks
 
 ---
 
@@ -309,6 +374,7 @@ styles:
 **Responsibility:**
 - Orchestrate full pipeline
 - Accept the target catalogue name and pass it through build and publish
+- Forward `--style-template <path>` and `--no-style-template` to publish
 
 ---
 
@@ -328,10 +394,28 @@ docker compose up -d
 ./scripts/rebuild-and-publish.sh --catalogue brandenburg data/incoming/brandenburg.osm.pbf
 ```
 
+Publishing a new catalogue creates `data/styles/<catalogue>/default.json` from `templates/styles/default.json` when that file is missing. The public style ID is `/style/<catalogue>`.
+
+### Custom Or Skipped Default Styles
+
+```
+./scripts/rebuild-and-publish.sh --catalogue berlin --style-template templates/styles/default.json data/incoming/berlin.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue berlin --no-style-template data/incoming/berlin.osm.pbf
+```
+
 ### Disable Martin UI
 
 ```
 MARTIN_WEBUI=disable docker compose up -d martin
+```
+
+### Add Or Refresh Styles
+
+```
+mkdir -p data/styles/berlin
+cp templates/styles/default.json data/styles/berlin/labels.json
+# edit data/styles/berlin/labels.json so its source URL references /berlin
+./scripts/refresh-martin.sh
 ```
 
 ---
@@ -365,6 +449,7 @@ MARTIN_WEBUI=disable docker compose up -d martin
 
 ### Invalid Style
 - Style registration aborts or Martin config validation fails before deployment
+- Invalid auto-style templates abort publish before Martin refresh
 
 ---
 
@@ -402,6 +487,7 @@ Recommended:
 - No high-availability requirement
 - Tiles served directly from disk
 - Catalogue and style names are managed by operators through scripts or version-controlled files
+- The default style template targets the current Planetiler/OpenMapTiles-compatible layer set emitted by this pipeline
 
 ---
 
@@ -450,4 +536,4 @@ It is suitable for:
 
 ---
 
-Generated on: 2026-03-19T17:57:32.060625 UTC
+Last updated: 2026-05-17

@@ -35,6 +35,7 @@
       p,
       label,
       button,
+      select,
       code {
         font-size: 0.95rem;
       }
@@ -46,7 +47,8 @@
         font-weight: 600;
       }
 
-      input {
+      input,
+      select {
         width: 100%;
         box-sizing: border-box;
         padding: 10px 12px;
@@ -133,8 +135,10 @@
       <label for="martinBase">Martin Base URL</label>
       <input id="martinBase" type="text" value="http://localhost:3000">
 
-      <label for="styleId">Style ID</label>
-      <input id="styleId" type="text" value="basemap">
+      <label for="styleId">Style</label>
+      <select id="styleId">
+        <option value="">Loading styles...</option>
+      </select>
 
       <div class="toggle">
         <input id="showTileDebug" type="checkbox">
@@ -157,22 +161,21 @@
     <script>
       const statusNode = document.getElementById("status");
       const martinBaseInput = document.getElementById("martinBase");
-      const styleIdInput = document.getElementById("styleId");
+      const styleSelect = document.getElementById("styleId");
       const showTileDebugInput = document.getElementById("showTileDebug");
       const reloadButton = document.getElementById("reloadButton");
       const params = new URLSearchParams(window.location.search);
+      const requestedStyleId = params.get("style") || "";
 
       if (params.get("base")) {
         martinBaseInput.value = params.get("base");
-      }
-      if (params.get("style")) {
-        styleIdInput.value = params.get("style");
       }
       if (params.get("debugTiles") === "1") {
         showTileDebugInput.checked = true;
       }
 
       let map;
+      let selectedStyleId = requestedStyleId;
 
       function setStatus(message) {
         statusNode.textContent = message;
@@ -184,6 +187,44 @@
           throw new Error(`request failed: ${response.status} ${response.statusText}`);
         }
         return response.json();
+      }
+
+      function populateStyleSelect(styles, preferredStyleId) {
+        const styleIds = Object.keys(styles || {}).sort((left, right) => left.localeCompare(right));
+        styleSelect.replaceChildren();
+
+        if (styleIds.length === 0) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No styles available";
+          styleSelect.append(option);
+          styleSelect.disabled = true;
+          selectedStyleId = "";
+          return "";
+        }
+
+        for (const styleId of styleIds) {
+          const option = document.createElement("option");
+          option.value = styleId;
+          option.textContent = styleId;
+          styleSelect.append(option);
+        }
+
+        const nextStyleId = styleIds.includes(preferredStyleId)
+          ? preferredStyleId
+          : styleIds.includes("basemap")
+            ? "basemap"
+            : styleIds[0];
+
+        styleSelect.value = nextStyleId;
+        styleSelect.disabled = false;
+        selectedStyleId = nextStyleId;
+        return nextStyleId;
+      }
+
+      async function refreshStyleOptions(baseUrl, preferredStyleId) {
+        const catalog = await fetchJson(`${baseUrl}/catalog`);
+        return populateStyleSelect(catalog.styles || {}, preferredStyleId);
       }
 
       async function normalizeVectorSource(baseUrl, source) {
@@ -218,8 +259,19 @@
 
       async function render() {
         const baseUrl = martinBaseInput.value.replace(/\/$/, "");
-        const styleId = styleIdInput.value.trim() || "basemap";
+        const styleId = styleSelect.value || selectedStyleId;
         const showTileDebug = showTileDebugInput.checked;
+
+        if (!styleId) {
+          if (map) {
+            map.remove();
+            map = undefined;
+          }
+          setStatus(`No styles are available from ${baseUrl}/catalog.`);
+          return;
+        }
+
+        selectedStyleId = styleId;
         const styleUrl = `${baseUrl}/style/${styleId}`;
 
         setStatus(`Loading ${styleUrl}`);
@@ -234,7 +286,7 @@
           container: "map",
           style,
           center: [13.42254, 52.50638],
-          zoom: 10,
+          zoom: 1,
           hash: true
         });
 
@@ -258,6 +310,14 @@
       }
 
       reloadButton.addEventListener("click", () => {
+        const baseUrl = martinBaseInput.value.replace(/\/$/, "");
+        refreshStyleOptions(baseUrl, styleSelect.value || selectedStyleId)
+          .then(() => render())
+          .catch((error) => setStatus(`Load failed: ${error.message}`));
+      });
+
+      styleSelect.addEventListener("change", () => {
+        selectedStyleId = styleSelect.value;
         render().catch((error) => setStatus(`Load failed: ${error.message}`));
       });
 
@@ -275,7 +335,9 @@
         }
       });
 
-      render().catch((error) => setStatus(`Load failed: ${error.message}`));
+      refreshStyleOptions(martinBaseInput.value.replace(/\/$/, ""), requestedStyleId)
+        .then(() => render())
+        .catch((error) => setStatus(`Load failed: ${error.message}`));
     </script>
   </body>
 </html>

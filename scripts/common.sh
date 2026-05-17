@@ -33,7 +33,15 @@ load_env() {
   fi
 
   : "${MARTIN_PORT:=3000}"
-  : "${TILESET_NAME:=basemap}"
+  if [[ -z "${DEFAULT_CATALOGUE:-}" ]]; then
+    DEFAULT_CATALOGUE="${TILESET_NAME:-basemap}"
+  fi
+  : "${TILESET_NAME:=${DEFAULT_CATALOGUE}}"
+  : "${MARTIN_WEBUI:=enable-for-all}"
+  case "${MARTIN_WEBUI}" in
+    enable-for-all|disable) ;;
+    *) die "unsupported MARTIN_WEBUI value: ${MARTIN_WEBUI} (expected enable-for-all or disable)" ;;
+  esac
   : "${PLANETILER_JAVA_XMX:=8g}"
   : "${PLANETILER_STORAGE:=mmap}"
   : "${BUILD_RETENTION:=3}"
@@ -47,6 +55,8 @@ load_env() {
   DATA_PUBLISHED_DIR="${DATA_DIR}/published"
   DATA_CACHE_DIR="${DATA_DIR}/cache"
   PLANETILER_CACHE_DIR="${DATA_CACHE_DIR}/planetiler"
+  STYLES_DIR="${DATA_DIR}/styles"
+  MARTIN_CONFIG_PATH="${REPO_ROOT}/martin/config.yaml"
 }
 
 ensure_directories() {
@@ -55,7 +65,10 @@ ensure_directories() {
     "${DATA_BUILD_DIR}" \
     "${DATA_PUBLISHED_DIR}" \
     "${PLANETILER_CACHE_DIR}/downloads" \
-    "${PLANETILER_CACHE_DIR}/tmp"
+    "${PLANETILER_CACHE_DIR}/tmp" \
+    "${STYLES_DIR}"
+
+  migrate_legacy_default_catalogue
 }
 
 compose() {
@@ -74,9 +87,95 @@ assert_mbtiles_in_build_dir() {
   esac
 }
 
+validate_catalogue_name() {
+  local catalogue="$1"
+
+  [[ "${catalogue}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]] \
+    || die "invalid catalogue name: ${catalogue} (use letters, numbers, underscores, and hyphens)"
+}
+
+catalogue_build_dir() {
+  local catalogue="$1"
+  validate_catalogue_name "${catalogue}"
+  printf '%s/%s\n' "${DATA_BUILD_DIR}" "${catalogue}"
+}
+
+catalogue_published_dir() {
+  local catalogue="$1"
+  validate_catalogue_name "${catalogue}"
+  printf '%s/%s\n' "${DATA_PUBLISHED_DIR}" "${catalogue}"
+}
+
+ensure_catalogue_directories() {
+  local catalogue="$1"
+  mkdir -p "$(catalogue_build_dir "${catalogue}")" "$(catalogue_published_dir "${catalogue}")"
+}
+
 relative_published_target() {
+  local catalogue="$1"
+  local mbtiles_path="$2"
+  local published_dir
+
+  published_dir=$(catalogue_published_dir "${catalogue}")
+  realpath --relative-to="${published_dir}" "${mbtiles_path}"
+}
+
+infer_catalogue_from_mbtiles_path() {
   local mbtiles_path="$1"
-  printf '../build/%s\n' "$(basename -- "${mbtiles_path}")"
+  local relative_path
+  local first_component
+
+  relative_path=$(realpath --relative-to="${DATA_BUILD_DIR}" "${mbtiles_path}")
+  first_component="${relative_path%%/*}"
+
+  if [[ "${relative_path}" != "${first_component}" && "${first_component}" != "." && "${first_component}" != ".." ]]; then
+    validate_catalogue_name "${first_component}"
+    printf '%s\n' "${first_component}"
+    return
+  fi
+
+  printf '%s\n' "${DEFAULT_CATALOGUE}"
+}
+
+migrate_legacy_default_catalogue() {
+  local legacy_link="${DATA_PUBLISHED_DIR}/current.mbtiles"
+  local default_dir="${DATA_PUBLISHED_DIR}/${DEFAULT_CATALOGUE}"
+  local default_link="${default_dir}/current.mbtiles"
+
+  if [[ -L "${legacy_link}" && ! -e "${default_link}" && ! -L "${default_link}" ]]; then
+    mkdir -p "${default_dir}"
+    ln -s ../current.mbtiles "${default_link}"
+  fi
+}
+
+style_id_from_path() {
+  local catalogue="$1"
+  local style_path="$2"
+  local style_name
+
+  style_name=$(basename -- "${style_path}" .json)
+  if [[ "${style_name}" == "default" ]]; then
+    printf '%s\n' "${catalogue}"
+  else
+    printf '%s-%s\n' "${catalogue}" "${style_name}"
+  fi
+}
+
+style_ids_for_catalogue() {
+  local catalogue="$1"
+  local style_dir="${STYLES_DIR}/${catalogue}"
+  local style_path
+
+  validate_catalogue_name "${catalogue}"
+  [[ -d "${style_dir}" ]] || return 0
+
+  while IFS= read -r style_path; do
+    style_id_from_path "${catalogue}" "${style_path}"
+  done < <(find "${style_dir}" -maxdepth 1 -type f -name '*.json' | sort)
+}
+
+generate_martin_config() {
+  "${SCRIPT_DIR}/generate-martin-config.sh" >/dev/null
 }
 
 build_planetiler_runtime_image() {

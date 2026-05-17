@@ -1,0 +1,526 @@
+{
+  "version": 8,
+  "name": "Basemap Default",
+  "metadata": {
+    "generator": "map-pipeline",
+    "description": "Simple diagnostic style for Planetiler OpenMapTiles-compatible output."
+  },
+  "glyphs": "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "/basemap"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f8f6f0"
+      }
+    },
+    {
+      "id": "landcover",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landcover",
+      "paint": {
+        "fill-color": "#d4e7be",
+        "fill-opacity": 0.65
+      }
+    },
+    {
+      "id": "landuse",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "landuse",
+      "paint": {
+        "fill-color": "#eadfc3",
+        "fill-opacity": 0.55
+      }
+    },
+    {
+      "id": "park",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "park",
+      "paint": {
+        "fill-color": "#bfe3aa",
+        "fill-opacity": 0.75
+      }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "water",
+      "paint": {
+        "fill-color": "#8fc9ea"
+      }
+    },
+    {
+      "id": "waterway",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "waterway",
+      "paint": {
+        "line-color": "#5faad4",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          0.4,
+          10,
+          1.1,
+          14,
+          2.4
+        ]
+      }
+    },
+    {
+      "id": "aeroway-fill",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "aeroway",
+      "minzoom": 10,
+      "paint": {
+        "fill-color": "#d8d5cf",
+        "fill-opacity": 0.75
+      }
+    },
+    {
+      "id": "aeroway-line",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "aeroway",
+      "minzoom": 10,
+      "paint": {
+        "line-color": "#aaa39a",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          0.7,
+          14,
+          2.2
+        ]
+      }
+    },
+    {
+      "id": "boundary",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "boundary",
+      "paint": {
+        "line-color": "#806a9d",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          0,
+          0.35,
+          6,
+          1.1,
+          12,
+          2
+        ],
+        "line-dasharray": [
+          2,
+          1.5
+        ]
+      }
+    },
+    {
+      "id": "transportation-casing",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "paint": {
+        "line-color": "#c9b89d",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          0.6,
+          10,
+          2,
+          14,
+          5.5
+        ]
+      }
+    },
+    {
+      "id": "transportation",
+      "type": "line",
+      "source": "basemap",
+      "source-layer": "transportation",
+      "paint": {
+        "line-color": "#ffffff",
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          0.3,
+          10,
+          1.2,
+          14,
+          4
+        ]
+      }
+    },
+    {
+      "id": "building",
+      "type": "fill",
+      "source": "basemap",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-color": "#cfc2b5",
+        "fill-opacity": 0.82,
+        "fill-outline-color": "#a99686"
+      }
+    },
+    {
+      "id": "mountain-peak-dot",
+      "type": "circle",
+      "source": "basemap",
+      "source-layer": "mountain_peak",
+      "minzoom": 7,
+      "paint": {
+        "circle-radius": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          7,
+          2,
+          14,
+          4
+        ],
+        "circle-color": "#8b5e3c",
+        "circle-stroke-color": "#fff7ea",
+        "circle-stroke-width": 1
+      }
+    },
+    {
+      "id": "poi-dot",
+      "type": "circle",
+      "source": "basemap",
+      "source-layer": "poi",
+      "minzoom": 12,
+      "paint": {
+        "circle-radius": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          1.7,
+          16,
+          3.2
+        ],
+        "circle-color": "#1769e0",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 0.9
+      }
+    },
+    {
+      "id": "place-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "place",
+      "minzoom": 3,
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name"
+          ],
+          [
+            "get",
+            "name_en"
+          ],
+          [
+            "get",
+            "name_int"
+          ]
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          3,
+          11,
+          7,
+          14,
+          12,
+          18
+        ]
+      },
+      "paint": {
+        "text-color": "#463c34",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 1.3
+      }
+    },
+    {
+      "id": "aerodrome-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "aerodrome_label",
+      "minzoom": 8,
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "iata"
+          ],
+          [
+            "get",
+            "name"
+          ]
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": 11,
+        "text-transform": "uppercase"
+      },
+      "paint": {
+        "text-color": "#5b6270",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "transportation-name",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "transportation_name",
+      "minzoom": 12,
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name"
+          ],
+          [
+            "get",
+            "ref"
+          ]
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          12,
+          10,
+          16,
+          14
+        ]
+      },
+      "paint": {
+        "text-color": "#6a6258",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "water-name",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "water_name",
+      "minzoom": 8,
+      "layout": {
+        "text-field": [
+          "get",
+          "name"
+        ],
+        "text-font": [
+          "Open Sans Italic"
+        ],
+        "text-size": 12
+      },
+      "paint": {
+        "text-color": "#2b78a2",
+        "text-halo-color": "rgba(255, 250, 240, 0.85)",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "waterway-name",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "waterway",
+      "minzoom": 11,
+      "layout": {
+        "symbol-placement": "line",
+        "text-field": [
+          "get",
+          "name"
+        ],
+        "text-font": [
+          "Open Sans Italic"
+        ],
+        "text-size": 11
+      },
+      "paint": {
+        "text-color": "#2b78a2",
+        "text-halo-color": "rgba(255, 250, 240, 0.85)",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "park-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "park",
+      "minzoom": 10,
+      "layout": {
+        "text-field": [
+          "get",
+          "name"
+        ],
+        "text-font": [
+          "Open Sans Italic"
+        ],
+        "text-size": 11
+      },
+      "paint": {
+        "text-color": "#477534",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "mountain-peak-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "mountain_peak",
+      "minzoom": 9,
+      "layout": {
+        "text-field": [
+          "coalesce",
+          [
+            "get",
+            "name"
+          ],
+          [
+            "get",
+            "ele"
+          ]
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": 11,
+        "text-offset": [
+          0,
+          0.9
+        ]
+      },
+      "paint": {
+        "text-color": "#6e4a2f",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "poi-label",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "poi",
+      "minzoom": 13,
+      "layout": {
+        "text-field": [
+          "get",
+          "name"
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": 11,
+        "text-offset": [
+          0,
+          0.8
+        ]
+      },
+      "paint": {
+        "text-color": "#174f9f",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      }
+    },
+    {
+      "id": "housenumber",
+      "type": "symbol",
+      "source": "basemap",
+      "source-layer": "housenumber",
+      "minzoom": 14,
+      "layout": {
+        "text-field": [
+          "get",
+          "housenumber"
+        ],
+        "text-font": [
+          "Open Sans Regular"
+        ],
+        "text-size": 10
+      },
+      "paint": {
+        "text-color": "#7a6a5e",
+        "text-halo-color": "#fffaf0",
+        "text-halo-width": 0.8
+      }
+    }
+  ]
+}

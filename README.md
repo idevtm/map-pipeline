@@ -2,17 +2,19 @@
 
 Deterministic tile build and serving pipeline for OpenStreetMap extracts on a single Ubuntu host.
 
-## What This Repository Does
+The pipeline turns `.osm.pbf` files into versioned `.mbtiles` archives with Planetiler, validates them, publishes each map under a named Martin catalogue entry, and serves one or more MapLibre styles for those catalogues.
 
-The pipeline turns a `.osm.pbf` file into a versioned `.mbtiles` archive with Planetiler, validates the archive, promotes it atomically through a stable symlink, and serves it through Martin under a stable source name.
-
-Data flow:
+## Data Flow
 
 ```text
-.osm.pbf -> Planetiler -> data/build/<timestamped>.mbtiles -> current.mbtiles symlink -> Martin serves /basemap
+.osm.pbf
+  -> Planetiler
+  -> data/build/<catalogue>/<timestamped>.mbtiles
+  -> data/published/<catalogue>/current.mbtiles
+  -> Martin serves /<catalogue> and /style/<style-id>
 ```
 
-Planetiler can generate either MVT or MLT tile payloads inside the MBTiles archive. This repository now exposes that choice through a build-time CLI flag.
+The default catalogue is `basemap`, but the scripts support any URL-safe catalogue name, such as `berlin`, `brandenburg`, or `planet-2026`.
 
 ## Repository Layout
 
@@ -21,27 +23,40 @@ Planetiler can generate either MVT or MLT tile payloads inside the MBTiles archi
 ├── docker-compose.yml
 ├── doc/
 ├── martin/
+│   └── config.yaml
 ├── scripts/
 ├── viewer/
 ├── data/
 │   ├── incoming/
 │   ├── build/
+│   │   └── <catalogue>/
 │   ├── published/
+│   │   └── <catalogue>/
+│   │       └── current.mbtiles
+│   ├── styles/
+│   │   └── <catalogue>/
+│   │       ├── default.json
+│   │       └── labels.json
 │   └── cache/
-└── styles/
+└── templates/
+    └── styles/
+        └── default.json
 ```
+
+`martin/config.yaml` is generated from the published catalogue symlinks and user style files under `data/styles/`. Do not edit it by hand.
 
 ## Requirements
 
 - Ubuntu 20.04+
 - Docker with the `docker compose` plugin
 - `sqlite3` for publish-time MBTiles validation
+- `python3` for default style creation, config generation, and endpoint validation
 
 Install the required packages on Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install docker.io docker-compose-plugin sqlite3 -y
+sudo apt install docker.io docker-compose-plugin sqlite3 python3 -y
 sudo usermod -aG docker "$USER"
 ```
 
@@ -52,193 +67,233 @@ Defaults live in `.env` and `.env.example`.
 Key variables:
 
 - `MARTIN_PORT`: Host port exposed for Martin. Default `3000`.
-- `TILESET_NAME`: Stable source ID used by the scripts and the bundled styles. Keep this at `basemap` unless you also update `martin/config.yaml` and the style source names.
+- `MARTIN_WEBUI`: Martin embedded UI mode. Default `enable-for-all`. Use `disable` to turn it off.
+- `DEFAULT_CATALOGUE`: Default catalogue when `--catalogue` is omitted. Default `basemap`.
 - `PLANETILER_JAVA_XMX`: JVM heap for Planetiler. Default `8g`.
 - `PLANETILER_STORAGE`: Planetiler temp storage mode. Default `mmap`.
-- `BUILD_RETENTION`: Number of build artifacts retained after successful publish. Default `3`.
+- `BUILD_RETENTION`: Number of build artifacts retained per catalogue after successful publish. Default `3`.
 
-Dependency versions for Martin and Planetiler are not managed through `.env`. They are pinned in Dockerfiles under `docker/` so Dependabot can update them automatically.
+Dependency versions for Martin and Planetiler are pinned in Dockerfiles under `docker/`.
 
-## First Run
+## Start Martin
 
-Start Martin in the background:
-
-```bash
-docker compose up -d
-```
-
-On the first run, Docker Compose builds the local Martin runtime image from `docker/martin/Dockerfile`.
-
-Build and publish tiles from a source extract:
+Generate config and start Martin:
 
 ```bash
-./scripts/rebuild-and-publish.sh data/incoming/map.osm.pbf
+./scripts/generate-martin-config.sh
+docker compose up -d martin
 ```
 
-If the input extract lives elsewhere on disk, pass its path directly. The build script mounts the input directory read-only into the Planetiler container.
+Martin's embedded UI is enabled by default at:
 
-## Repeat Runs
+```text
+http://localhost:3000/
+```
 
-Run the same orchestration command again with a new or updated `.osm.pbf` file:
+Disable the UI:
 
 ```bash
-./scripts/rebuild-and-publish.sh /path/to/new.osm.pbf
+MARTIN_WEBUI=disable docker compose up -d martin
 ```
 
-Each build produces a new timestamped file in `data/build/`. Publishing never overwrites the previously active MBTiles file in place.
+## Build And Publish One Catalogue
 
-## Script Reference
-
-### Build Only
+Build and publish the default `basemap` catalogue:
 
 ```bash
-./scripts/build-tiles.sh data/incoming/map.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue basemap data/incoming/berlin.osm.pbf
 ```
 
-Build MLT tiles instead of MVT:
+Build and publish a separate catalogue:
 
 ```bash
-./scripts/build-tiles.sh --tile-format mlt data/incoming/map.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue brandenburg data/incoming/brandenburg.osm.pbf
 ```
 
-Behavior:
+Each catalogue gets its own stable endpoint:
 
-- Validates the input path and file extension.
-- Builds the local Planetiler runtime image from `docker/planetiler/Dockerfile`.
-- Runs Planetiler in Docker using that local image.
-- Uses Planetiler `--tile-format=mvt` by default.
-- Passes `--tile-format=mlt` when requested through `--tile-format mlt` or `--mlt`.
-- Writes a versioned MBTiles file to `data/build/`.
-- Prints the absolute output path on success.
+```text
+http://localhost:3000/basemap
+http://localhost:3000/brandenburg
+```
 
-## Dependency Updates With Dependabot
+Publishing refreshes Martin automatically, so clients see the newly selected `current.mbtiles`.
+If `data/styles/<catalogue>/default.json` does not exist, publishing also creates it from `templates/styles/default.json`; the resulting style is served as `/style/<catalogue>`.
 
-Martin and Planetiler are pinned in these files:
-
-- `docker/martin/Dockerfile`
-- `docker/planetiler/Dockerfile`
-
-Dependabot is configured in `.github/dependabot.yml` to watch both Dockerfile directories and open update PRs when new base images are available.
-
-After merging a Dependabot PR:
+Use a custom default style template during the full pipeline:
 
 ```bash
-docker compose build martin
-./scripts/build-tiles.sh data/incoming/map.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue brandenburg --style-template templates/styles/default.json data/incoming/brandenburg.osm.pbf
 ```
 
-That rebuilds the local Martin runtime image and the local Planetiler runtime image with the updated base image versions.
-
-### Publish Only
+Skip automatic default style creation:
 
 ```bash
-./scripts/publish-tiles.sh data/build/map-20260319T180000Z.mbtiles
+./scripts/rebuild-and-publish.sh --catalogue brandenburg --no-style-template data/incoming/brandenburg.osm.pbf
 ```
 
-Behavior:
+## Build And Publish Separately
 
-- Validates SQLite integrity with `PRAGMA quick_check`.
-- Requires metadata keys `name`, `format`, `minzoom`, and `maxzoom`.
-- Verifies that the `tiles` table is non-empty.
-- Creates a temporary symlink and atomically renames it to `data/published/current.mbtiles`.
-- Restarts Martin with `docker compose restart martin`.
-- Runs endpoint smoke tests against `/catalog`, `/basemap`, `/style/basemap`, and `/style/basemap-labels`.
-- Rolls back to the previous `current.mbtiles` symlink target if the smoke tests fail.
-- Deletes older build artifacts while keeping the active target and the newest retained builds.
-
-### Full Pipeline
+Build only:
 
 ```bash
-./scripts/rebuild-and-publish.sh data/incoming/map.osm.pbf
+./scripts/build-tiles.sh --catalogue berlin data/incoming/berlin.osm.pbf
 ```
 
-Full pipeline with MLT output:
+Publish an existing build:
 
 ```bash
-./scripts/rebuild-and-publish.sh --tile-format mlt data/incoming/map.osm.pbf
+./scripts/publish-tiles.sh --catalogue berlin data/build/berlin/berlin-20260516T090000Z.mbtiles
 ```
 
-Behavior:
+When `--catalogue` is omitted, publish infers it from `data/build/<catalogue>/...`. Root-level legacy build files publish to `DEFAULT_CATALOGUE`.
 
-- Runs build and publish sequentially.
-- Stops on the first failure.
-- Leaves the currently published tiles untouched if the build or validation fails.
-
-## MVT And MLT Options
-
-Planetiler supports generating MapLibre Tiles with `--tile-format=mlt` in addition to the default MVT output. Martin supports serving MLT tiles from MBTiles and detects them as `application/vnd.maplibre-vector-tile`.
-
-Technical options in this repository:
-
-- Default MVT build: `./scripts/build-tiles.sh data/incoming/map.osm.pbf`
-- Explicit MVT build: `./scripts/build-tiles.sh --tile-format mvt data/incoming/map.osm.pbf`
-- Explicit MLT build: `./scripts/build-tiles.sh --tile-format mlt data/incoming/map.osm.pbf`
-- MLT shorthand: `./scripts/build-tiles.sh --mlt data/incoming/map.osm.pbf`
-- Full pipeline with MLT: `./scripts/rebuild-and-publish.sh --mlt data/incoming/map.osm.pbf`
-
-Operational notes:
-
-- The published artifact is still an `.mbtiles` file in both cases. Only the tile payload format inside the archive changes.
-- Martin can serve both formats from MBTiles.
-- The current bundled MapLibre GL viewer and styles are designed for MVT. Treat MLT output as a server-side/archive option unless your downstream client stack explicitly supports MLT.
-- Publish validation still checks SQLite integrity, metadata presence, and tile presence. It does not attempt client-side rendering validation for MLT.
-
-### Smoke Test Only
+Use a custom style template for the auto-created default style:
 
 ```bash
-./scripts/smoke-test.sh
+./scripts/publish-tiles.sh --catalogue berlin --style-template templates/styles/default.json data/build/berlin/berlin-20260516T090000Z.mbtiles
 ```
 
-Behavior:
+Skip automatic style creation:
 
-- Verifies that `GET /catalog` returns `tiles.basemap`, `styles.basemap`, and `styles.basemap-labels`.
-- Verifies that `GET /basemap` returns TileJSON with a valid tile URL.
-- Verifies that `GET /style/basemap` returns a style document with a `basemap` source.
-- Verifies that `GET /style/basemap-labels` returns a style document with a `basemap` source.
-- Accepts an optional base URL, for example `./scripts/smoke-test.sh http://localhost:3000`.
+```bash
+./scripts/publish-tiles.sh --catalogue berlin --no-style-template data/build/berlin/berlin-20260516T090000Z.mbtiles
+```
 
-## Martin Endpoints
+## MVT And MLT
 
-- Catalog: `http://localhost:${MARTIN_PORT:-3000}/catalog`
-- TileJSON for the stable source: `http://localhost:${MARTIN_PORT:-3000}/basemap`
-- Minimal geometry style: `http://localhost:${MARTIN_PORT:-3000}/style/basemap`
-- Label and POI style: `http://localhost:${MARTIN_PORT:-3000}/style/basemap-labels`
+Planetiler supports MVT and MLT tile payloads inside MBTiles. MVT is the default.
 
-## Verification
+```bash
+./scripts/rebuild-and-publish.sh --catalogue berlin --tile-format mvt data/incoming/berlin.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue berlin --tile-format mlt data/incoming/berlin.osm.pbf
+./scripts/rebuild-and-publish.sh --catalogue berlin --mlt data/incoming/berlin.osm.pbf
+```
 
-Check the catalog:
+The bundled viewer and style template are designed for MVT. Treat MLT as a server/archive option unless your client stack supports MLT.
+
+## Styles
+
+Martin serves user-owned style JSON from `data/styles/<catalogue>/*.json`. Files under `data/styles/` are intentionally ignored by Git, except for `data/styles/.gitkeep`.
+
+The committed default template is `templates/styles/default.json`. It uses one source named `basemap`, points to `/basemap` by default, and includes simple render layers for the current Planetiler/OpenMapTiles-compatible layer set. When publish creates `data/styles/<catalogue>/default.json`, it keeps the source key as `basemap`, rewrites the style name, and rewrites only the source URL to `/<catalogue>`.
+
+The default template covers these emitted layers: `aerodrome_label`, `aeroway`, `boundary`, `building`, `housenumber`, `landcover`, `landuse`, `mountain_peak`, `park`, `place`, `poi`, `transportation`, `transportation_name`, `water`, `water_name`, and `waterway`. POIs render as small blue dots with name labels.
+
+Templates used with `--style-template` must be MapLibre style version 8 JSON, define a `sources.basemap` object, and only reference defined sources from layers.
+
+Style IDs are derived from the path:
+
+```text
+data/styles/basemap/default.json -> /style/basemap
+data/styles/basemap/labels.json  -> /style/basemap-labels
+data/styles/berlin/default.json  -> /style/berlin
+data/styles/berlin/dark.json     -> /style/berlin-dark
+```
+
+The style JSON should reference the matching catalogue source:
+
+```json
+{
+  "version": 8,
+  "name": "Berlin",
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "/berlin"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#f4f0e6"
+      }
+    }
+  ]
+}
+```
+
+To add a style for a published catalogue:
+
+```bash
+mkdir -p data/styles/berlin
+cp templates/styles/default.json data/styles/berlin/labels.json
+```
+
+Edit `data/styles/berlin/labels.json` so its `name` and source URL fit `berlin`. Keep the source key and layer `source` values as `basemap` unless you are intentionally creating a multi-source style. Then refresh Martin:
+
+```bash
+./scripts/refresh-martin.sh
+```
+
+Style-only edits do not require rebuilding MBTiles.
+
+## Refresh Martin
+
+Use this after adding/removing styles or after changing published catalogue folders by hand:
+
+```bash
+./scripts/refresh-martin.sh
+```
+
+The refresh script:
+
+- regenerates `martin/config.yaml`
+- starts Martin if needed
+- restarts Martin so it reloads catalogue and style registrations
+
+Tile publishing runs the same refresh automatically.
+
+## Endpoints
+
+```text
+GET /                         Martin embedded UI when enabled
+GET /catalog                  Catalogue of tile, style, sprite, and font sources
+GET /<catalogue>              TileJSON for a catalogue
+GET /<catalogue>/<z>/<x>/<y>  Tile payload
+GET /style/<style-id>         MapLibre style JSON
+```
+
+Examples:
 
 ```bash
 curl http://localhost:3000/catalog
+curl http://localhost:3000/berlin
+curl http://localhost:3000/style/berlin
+curl http://localhost:3000/style/berlin-dark
 ```
 
-Check the source TileJSON:
+## Smoke Tests
 
-```bash
-curl http://localhost:3000/basemap
-```
-
-Check the served style:
-
-```bash
-curl http://localhost:3000/style/basemap
-```
-
-Check the label and POI style:
-
-```bash
-curl http://localhost:3000/style/basemap-labels
-```
-
-Run the automated endpoint smoke tests:
+Test the default catalogue:
 
 ```bash
 ./scripts/smoke-test.sh
+```
+
+Test a specific catalogue and all styles under `data/styles/<catalogue>/`:
+
+```bash
+./scripts/smoke-test.sh --catalogue berlin
+```
+
+Test selected styles:
+
+```bash
+./scripts/smoke-test.sh --catalogue berlin --style berlin --style berlin-dark
+```
+
+Use a remote or forwarded Martin URL:
+
+```bash
+./scripts/smoke-test.sh --catalogue berlin http://localhost:3000
 ```
 
 ## Local Viewer
 
-The repository includes a minimal viewer at [viewer/index.html](viewer/index.html) for manual visual validation.
+The repository includes a minimal viewer at [viewer/index.html](viewer/index.html) for manual visual validation. It fetches Martin's `/catalog` endpoint and presents a dynamic style dropdown.
 
 Serve it locally:
 
@@ -246,51 +301,57 @@ Serve it locally:
 python3 -m http.server --directory viewer 8081
 ```
 
-Then open:
+Open:
 
 ```text
-http://localhost:8081
+http://localhost:8081/?base=http://localhost:3000&style=basemap
 ```
 
 Optional query parameters:
 
-- `base`: Martin base URL, for example `http://localhost:3000`
-- `style`: Martin style id, default `basemap`
+- `base`: Martin base URL, for example `http://localhost:3000`.
+- `style`: Martin style ID to preselect. If absent or unavailable, the viewer selects `basemap` when present, otherwise the first style in `/catalog`.
+- `debugTiles`: Set to `1` to show tile boundaries, coordinates, and sizes.
 
-Example:
+Examples:
 
 ```text
-http://localhost:8081/?base=http://localhost:3000&style=basemap-labels
+http://localhost:8081/?base=http://localhost:3000&style=basemap
+http://localhost:8081/?base=http://localhost:3000&style=berlin
+http://localhost:8081/?base=http://localhost:3000&style=berlin-dark&debugTiles=1
 ```
 
-Bundled styles:
-
-- `basemap`: Minimal geometry-focused preview style.
-- `basemap-labels`: More complete preview style with place labels, road labels, water labels, and POI markers.
+`debugTiles=1` enables MapLibre's tile boundary, tile coordinate, and tile size overlay.
 
 ## Operational Notes
 
-- `current.mbtiles` is a symlink in `data/published/` that points at a versioned file in `data/build/`.
-- The symlink target is relative so it resolves correctly both on the host and inside the Martin container.
-- Martin is restarted after every publish to ensure the new file is reopened.
-- Martin is configured with `cors: true` so the local viewer can fetch the style and tiles from another local port.
-- The label-bearing style uses the OpenMapTiles public glyph endpoint for text rendering in the local viewer.
-- Retention cleanup only runs after a successful publish.
+- Each catalogue has its own `data/published/<catalogue>/current.mbtiles` symlink.
+- Symlink targets are relative so they resolve on the host and inside the Martin container.
+- Publishing one catalogue does not change other catalogues.
+- Martin is restarted after every publish so the MBTiles file handle is reopened.
+- Retention cleanup runs per catalogue after a successful publish.
+- The default style template uses the OpenMapTiles public glyph endpoint for text rendering in the local viewer.
+- The embedded Martin UI is convenient for operators; disable or protect it for public deployments.
 
 ## Failure Handling
 
 ### Invalid MBTiles
 
-If validation fails, publish aborts and the active tiles remain unchanged.
+Publish aborts and the active catalogue symlink remains unchanged.
 
 ### Docker or Planetiler Failure
 
 If the build step fails, no publish occurs.
 
-### Martin Restart Failure
+### Martin Refresh Failure
 
-The publish step exits non-zero after the symlink swap. The new tiles remain selected on disk, but Martin must be restarted successfully before clients will see the new version.
+The publish step exits non-zero after the symlink swap. The new tiles remain selected on disk, but Martin must be refreshed successfully before clients will see the new version.
 
-## Current Implementation Status
+### Invalid Style Template
 
-The pipeline has been tested end-to-end against real extracts and now includes automatic post-publish smoke tests plus a local MapLibre viewer for visual validation.
+Publish aborts before refreshing Martin if the selected template is invalid JSON, is not MapLibre style version 8, does not define `sources.basemap`, or has layers referencing missing sources.
+
+### Smoke Test Failure
+
+Publish rolls the affected catalogue back to its previous symlink target when one existed, refreshes Martin again, and exits non-zero.
+If publish created `data/styles/<catalogue>/default.json` during that failed publish, that newly created style is removed during rollback.

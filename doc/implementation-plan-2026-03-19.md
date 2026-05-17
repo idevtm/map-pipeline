@@ -2,7 +2,7 @@
 
 Date: 2026-03-19
 
-Status: Historical bootstrap plan. The current requirements have since expanded to include multiple Martin catalogue entries, multiple style sources, and command-line control of Martin's embedded UI. See `doc/map-pipeline-requirements.md` for the current target behavior.
+Status: Historical bootstrap plan. The current requirements have since expanded to include multiple Martin catalogue entries, user-owned styles under `data/styles/`, automatic default style creation from `templates/styles/default.json`, dynamic viewer style selection, and command-line control of Martin's embedded UI. See `doc/map-pipeline-requirements.md` for the current target behavior.
 
 ## Goal
 
@@ -19,7 +19,7 @@ Turn the repository from a stub into a reproducible single-node tile build and s
 - Martin image defaults to `ghcr.io/maplibre/martin:latest` because the release tag was not available in the registry during runtime validation.
 - Martin refresh is handled by `docker compose restart martin` after publish.
 - Retention keeps the newest three build artifacts after a successful publish.
-- A working starter MapLibre style is included instead of a placeholder.
+- A working starter MapLibre style was included instead of a placeholder. Current style templates now live under `templates/styles/`, while per-catalogue styles are user data under `data/styles/`.
 
 ## Delivery Scope
 
@@ -49,7 +49,7 @@ Turn the repository from a stub into a reproducible single-node tile build and s
 ### Repository Layout
 
 - Track the required `data/` directories with `.gitkeep` files.
-- Add a starter `styles/style.json` that targets Martin’s `basemap` source.
+- Add a starter MapLibre style that targets Martin’s `basemap` source. This was later superseded by the `templates/styles/default.json` workflow.
 - Expand `README.md` into an operator-facing runbook.
 
 ## Verification Plan
